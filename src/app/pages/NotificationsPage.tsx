@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Bell, UserX, CalendarDays, FileWarning, Timer, Settings2,
   CheckCheck, Trash2, Filter, X
 } from "lucide-react";
-import { notifications as initialNotifs, Notification, employees } from "../data/mockData";
+import { Notification } from "../data/mockData";
+import { useAuth } from "../context/AuthContext";
+import { notificationsApi } from "../services/api";
 
 const typeConfig: Record<string, {
   icon: React.ComponentType<{ size?: number }>;
@@ -30,8 +32,13 @@ function timeAgo(dateStr: string): string {
 }
 
 export function NotificationsPage() {
-  const [notifs, setNotifs] = useState<Notification[]>(initialNotifs);
+  const { employees, currentUser } = useAuth();
+  const [notifs, setNotifs] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<"Tous" | "Non lus" | "absence" | "conge" | "document" | "retard" | "system">("Tous");
+
+  useEffect(() => {
+    notificationsApi.getAll(currentUser?.companyId ?? undefined).then(setNotifs).catch(console.error);
+  }, [currentUser?.companyId]);
 
   const filtered = notifs.filter((n) => {
     if (filter === "Tous") return true;
@@ -41,10 +48,22 @@ export function NotificationsPage() {
 
   const unreadCount = notifs.filter((n) => !n.read).length;
 
-  const markAllRead = () => setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
-  const markRead = (id: string) => setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
-  const deleteNotif = (id: string) => setNotifs((prev) => prev.filter((n) => n.id !== id));
-  const clearAll = () => setNotifs([]);
+  const markAllRead = async () => {
+    await notificationsApi.markAllRead().catch(console.error);
+    setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+  const markRead = async (id: string) => {
+    await notificationsApi.markRead(id).catch(console.error);
+    setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  };
+  const deleteNotif = async (id: string) => {
+    await notificationsApi.deleteOne(id).catch(console.error);
+    setNotifs((prev) => prev.filter((n) => n.id !== id));
+  };
+  const clearAll = async () => {
+    await notificationsApi.deleteAll().catch(console.error);
+    setNotifs([]);
+  };
 
   const categories = [
     { key: "Tous", label: "Tout" },

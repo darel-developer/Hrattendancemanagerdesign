@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Plus, CheckCircle2, XCircle, Clock, CalendarDays, X,
   MessageSquare, User, TrendingDown
 } from "lucide-react";
-import { leaveRequests, LeaveRequest } from "../data/mockData";
+import { LeaveRequest } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
+import { leavesApi, notificationsApi } from "../services/api";
 
 const leaveTypeColors: Record<string, { bg: string; text: string }> = {
   "Congé annuel": { bg: "#EDE9FE", text: "#7C3AED" },
@@ -256,7 +257,11 @@ export function LeavesPage() {
   const [filterStatus, setFilterStatus] = useState("Tous");
   const [showNewModal, setShowNewModal] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ leave: any; action: "approve" | "reject" } | null>(null);
-  const [leaves, setLeaves] = useState(leaveRequests);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+
+  useEffect(() => {
+    leavesApi.getAll({ companyId: currentUser?.companyId ?? undefined }).then(setLeaves).catch(console.error);
+  }, [currentUser?.companyId]);
 
   // Role-based filtering
   const getVisibleLeaves = () => {
@@ -283,39 +288,40 @@ export function LeavesPage() {
   const approved = visibleLeaves.filter((l) => l.status === "Approuvé").length;
   const refused = visibleLeaves.filter((l) => l.status === "Refusé").length;
 
-  const handleNewLeave = (leave: Partial<LeaveRequest>) => {
-    const newLeave: LeaveRequest = {
-      id: `LVE${Date.now()}`,
-      employeeId: currentUser?.id ?? "",
-      type: leave.type as any,
-      startDate: leave.startDate ?? "",
-      endDate: leave.endDate ?? "",
-      days: leave.days ?? 0,
-      reason: leave.reason ?? "",
-      status: "En attente",
-      requestDate: new Date().toISOString().split("T")[0],
-      reviewedBy: null,
-      reviewDate: null,
-      comment: "",
-    };
-    setLeaves((prev) => [newLeave, ...prev]);
+  const handleNewLeave = async (leave: Partial<LeaveRequest>) => {
+    try {
+      const created = await leavesApi.create({
+        ...leave,
+        employeeId: currentUser?.id ?? "",
+        status: "En attente",
+        requestDate: new Date().toISOString().split("T")[0],
+      });
+      setLeaves((prev) => [created, ...prev]);
+      notificationsApi.create({
+        type: "conge",
+        title: "Nouvelle demande de congé",
+        message: `${currentUser?.firstName} ${currentUser?.lastName} a soumis une demande de ${leave.type} (${leave.days} jour${(leave.days ?? 0) > 1 ? "s" : ""})`,
+        employeeId: currentUser?.id,
+      }).catch(console.error);
+    } catch (err) {
+      console.error("Erreur création congé :", err);
+    }
   };
 
-  const handleConfirmReview = (comment: string) => {
+  const handleConfirmReview = async (comment: string) => {
     if (!reviewTarget) return;
-    setLeaves((prev) =>
-      prev.map((l) =>
-        l.id === reviewTarget.leave.id
-          ? {
-              ...l,
-              status: reviewTarget.action === "approve" ? "Approuvé" : "Refusé",
-              comment,
-              reviewedBy: currentUser?.id ?? null,
-              reviewDate: new Date().toISOString().split("T")[0],
-            }
-          : l
-      )
-    );
+    const newStatus = reviewTarget.action === "approve" ? "Approuvé" : "Refusé";
+    try {
+      const updated = await leavesApi.update(reviewTarget.leave.id, {
+        status: newStatus,
+        comment,
+        reviewedBy: currentUser?.id ?? null,
+        reviewDate: new Date().toISOString().split("T")[0],
+      });
+      setLeaves((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+    } catch (err) {
+      console.error("Erreur mise à jour congé :", err);
+    }
     setReviewTarget(null);
   };
 

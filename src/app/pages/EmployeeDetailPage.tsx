@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { motion } from "motion/react";
 import {
@@ -6,14 +6,30 @@ import {
   Clock, CalendarDays, TrendingUp, Edit2, Download, MoreVertical,
   Shield, CheckCircle2, XCircle, Timer
 } from "lucide-react";
-import { attendanceRecords, leaveRequests } from "../data/mockData";
+import { AttendanceRecord, LeaveRequest } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
+import { attendanceApi, leavesApi } from "../services/api";
 
 export function EmployeeDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { employees } = useAuth();
   const [activeTab, setActiveTab] = useState<"overview" | "attendance" | "leaves">("overview");
+  const [empRecords, setEmpRecords] = useState<AttendanceRecord[]>([]);
+  const [empLeaves, setEmpLeaves] = useState<LeaveRequest[]>([]);
+
+  useEffect(() => {
+    if (!id) return;
+    Promise.all([
+      attendanceApi.getAll({ employeeId: id }),
+      leavesApi.getAll({ employeeId: id }),
+    ])
+      .then(([att, lvs]) => {
+        setEmpRecords(att.slice(0, 10));
+        setEmpLeaves(lvs);
+      })
+      .catch(console.error);
+  }, [id]);
 
   const emp = employees.find((e) => e.id === id);
   if (!emp) {
@@ -23,9 +39,6 @@ export function EmployeeDetailPage() {
       </div>
     );
   }
-
-  const empRecords = attendanceRecords.filter((r) => r.employeeId === id).slice(0, 10);
-  const empLeaves = leaveRequests.filter((l) => l.employeeId === id);
   const leaveRemaining = emp.leaveBalance - emp.leaveUsed;
 
   const statusColors: Record<string, { bg: string; text: string }> = {
@@ -49,12 +62,12 @@ export function EmployeeDetailPage() {
   ];
 
   const infoItems = [
-    { icon: Mail, label: "Email", value: emp.email },
-    { icon: Phone, label: "Téléphone", value: emp.phone },
-    { icon: MapPin, label: "Adresse", value: emp.address },
-    { icon: Calendar, label: "Date de naissance", value: new Date(emp.birthDate).toLocaleDateString("fr-FR") },
+    { icon: Mail, label: "Email", value: emp.email || "—" },
+    { icon: Phone, label: "Téléphone", value: emp.phone || "—" },
+    { icon: MapPin, label: "Adresse", value: emp.address || "—" },
+    { icon: Calendar, label: "Date de naissance", value: emp.birthDate ? new Date(emp.birthDate).toLocaleDateString("fr-FR") : "—" },
     { icon: Briefcase, label: "Contrat", value: emp.contractType },
-    { icon: Calendar, label: "Date d'entrée", value: new Date(emp.startDate).toLocaleDateString("fr-FR") },
+    { icon: Calendar, label: "Date d'entrée", value: emp.startDate ? new Date(emp.startDate).toLocaleDateString("fr-FR") : "—" },
   ];
 
   return (
@@ -87,7 +100,7 @@ export function EmployeeDetailPage() {
         </div>
 
         {/* Info */}
-        <div className="px-6 pb-6">
+        <div className="px-3 md:px-6 pb-6">
           <div className="flex items-end justify-between -mt-12 mb-4 flex-wrap gap-4">
             <div className="flex items-end gap-4">
               <img
@@ -151,8 +164,8 @@ export function EmployeeDetailPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
             {[
-              { label: "Ancienneté", value: `${new Date().getFullYear() - new Date(emp.startDate).getFullYear()} ans`, color: "#6366F1", bg: "#EDE9FE" },
-              { label: "Salaire", value: `${emp.salary.toLocaleString("fr-FR")} €`, color: "#10B981", bg: "#D1FAE5" },
+              { label: "Ancienneté", value: emp.startDate ? `${new Date().getFullYear() - new Date(emp.startDate).getFullYear()} ans` : "—", color: "#6366F1", bg: "#EDE9FE" },
+              { label: "Salaire", value: `${(emp.salary ?? 0).toLocaleString("fr-FR")} FCFA`, color: "#10B981", bg: "#D1FAE5" },
               { label: "Congés restants", value: `${leaveRemaining} jours`, color: "#F59E0B", bg: "#FEF3C7" },
               { label: "Congés utilisés", value: `${emp.leaveUsed} jours`, color: "#8B5CF6", bg: "#F5F3FF" },
             ].map((s) => (
@@ -260,7 +273,7 @@ export function EmployeeDetailPage() {
 
         {activeTab === "attendance" && (
           <div
-            className="rounded-2xl overflow-hidden"
+            className="rounded-2xl overflow-hidden overflow-x-auto"
             style={{ background: "white", border: "1px solid #F1F3F9", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
           >
             <div className="px-5 py-4 border-b" style={{ borderColor: "#F9FAFB" }}>

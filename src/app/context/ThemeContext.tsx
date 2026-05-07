@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { translations, TranslationKey } from "../data/translations";
 
 export type Theme = "light" | "dark";
 export type Language = "fr" | "en";
@@ -10,6 +11,7 @@ interface ThemeContextType {
   setLanguage: (l: Language) => void;
   isDark: boolean;
   toggleTheme: () => void;
+  t: (key: TranslationKey) => string;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -41,9 +43,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setTheme = (t: Theme) => setThemeState(t);
   const toggleTheme = () => setThemeState((prev) => (prev === "light" ? "dark" : "light"));
   const setLanguage = (l: Language) => setLanguageState(l);
+  const t = (key: TranslationKey): string => translations[language][key];
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, language, setLanguage, isDark: theme === "dark", toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, language, setLanguage, isDark: theme === "dark", toggleTheme, t }}>
       {children}
     </ThemeContext.Provider>
   );

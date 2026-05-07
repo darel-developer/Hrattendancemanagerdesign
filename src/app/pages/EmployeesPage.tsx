@@ -29,7 +29,7 @@ const contractColor: Record<string, { bg: string; text: string }> = {
 
 interface AddEmployeeModalProps {
   onClose: () => void;
-  onAdd: (emp: Employee) => void;
+  onAdd: (emp: Employee & { password?: string; pin?: string }) => Promise<void>;
   allEmployees: Employee[];
 }
 
@@ -45,13 +45,17 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProp
     birthDate: "",
     salary: "",
     managerId: "",
+    password: "",
+    pin: "",
   });
 
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const managers = allEmployees.filter((e) => e.role === "Manager" || e.role === "Admin");
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    setError("");
     if (!form.firstName || !form.lastName || !form.email || !form.salary) {
       setError("Veuillez remplir tous les champs obligatoires (prénom, nom, email, salaire).");
       return;
@@ -61,8 +65,8 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProp
       setError("Le salaire doit être un nombre positif.");
       return;
     }
-    const newEmp: Employee = {
-      id: `EMP${String(allEmployees.length + 1).padStart(3, "0")}`,
+    const newEmp: Employee & { password?: string; pin?: string } = {
+      id: `EMP${Date.now().toString(36).slice(-7).toUpperCase()}`,
       firstName: form.firstName,
       lastName: form.lastName,
       email: form.email,
@@ -80,9 +84,17 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProp
       birthDate: form.birthDate,
       leaveBalance: 25,
       leaveUsed: 0,
+      password: form.password || "admin1234",
+      pin: form.pin || "1234",
     };
-    onAdd(newEmp);
-    onClose();
+    setLoading(true);
+    try {
+      await onAdd(newEmp);
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "Erreur lors de la création de l'employé.");
+      setLoading(false);
+    }
   };
 
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
@@ -140,7 +152,7 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProp
 
           {/* Salary field - prominent */}
           <div className="col-span-2">
-            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Salaire mensuel brut (€) *</label>
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Salaire mensuel brut (FCFA) *</label>
             <div className="relative">
               <Euro size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#6366F1" }} />
               <input
@@ -228,6 +240,32 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProp
               style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
             />
           </div>
+
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Mot de passe initial</label>
+            <input
+              type="password"
+              placeholder="admin1234 (défaut)"
+              value={form.password}
+              onChange={(e) => set("password", e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>PIN pointage (4 chiffres)</label>
+            <input
+              type="text"
+              maxLength={4}
+              placeholder="1234 (défaut)"
+              value={form.pin}
+              onChange={(e) => set("pin", e.target.value.replace(/\D/g, ""))}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+            />
+            <p className="text-xs mt-1" style={{ color: "var(--hr-text-light)" }}>Utilisé pour le terminal de pointage kiosque</p>
+          </div>
         </div>
 
         {/* Salary preview */}
@@ -236,9 +274,9 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProp
             <p className="text-xs" style={{ color: "var(--hr-text-muted)", fontWeight: 600 }}>Aperçu calcul mensuel</p>
             <div className="grid grid-cols-3 gap-3 mt-2">
               {[
-                { label: "Brut mensuel", value: `${parseFloat(form.salary).toLocaleString("fr-FR")} €` },
-                { label: "Déduction/jour abs.", value: `${(parseFloat(form.salary) / 22).toFixed(0)} €` },
-                { label: "Net estimé (~77%)", value: `${(parseFloat(form.salary) * 0.77).toFixed(0)} €` },
+                { label: "Brut mensuel", value: `${parseFloat(form.salary).toLocaleString("fr-FR")} FCFA` },
+                { label: "Déduction/jour abs.", value: `${(parseFloat(form.salary) / 22).toFixed(0)} FCFA` },
+                { label: "Net estimé (~77%)", value: `${(parseFloat(form.salary) * 0.77).toFixed(0)} FCFA` },
               ].map((item) => (
                 <div key={item.label} className="text-center">
                   <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>{item.label}</p>
@@ -255,11 +293,232 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProp
           >
             Annuler
           </button>
-          <button onClick={handleSubmit}
-            className="flex-1 py-2.5 rounded-xl text-white text-sm hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
+          <button onClick={handleSubmit} disabled={loading}
+            className="flex-1 py-2.5 rounded-xl text-white text-sm hover:opacity-90 flex items-center justify-center gap-2"
+            style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700, opacity: loading ? 0.7 : 1 }}
           >
-            Ajouter l'employé
+            {loading ? (
+              <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Création…</>
+            ) : "Ajouter l'employé"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+interface EditEmployeeModalProps {
+  emp: Employee;
+  onClose: () => void;
+  onSave: (id: string, updates: Partial<Employee> & { password?: string }) => Promise<void>;
+  allEmployees: Employee[];
+}
+
+function EditEmployeeModal({ emp, onClose, onSave, allEmployees }: EditEmployeeModalProps) {
+  const [form, setForm] = useState({
+    firstName: emp.firstName,
+    lastName: emp.lastName,
+    email: emp.email,
+    phone: emp.phone || "",
+    position: emp.position || "",
+    department: emp.department as any,
+    contractType: emp.contractType as any,
+    role: emp.role as any,
+    startDate: emp.startDate || "",
+    birthDate: emp.birthDate || "",
+    salary: emp.salary != null ? String(emp.salary) : "",
+    managerId: emp.manager || "",
+    address: emp.address || "",
+    status: emp.status as any,
+    password: "",
+  });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const managers = allEmployees.filter((e) => (e.role === "Manager" || e.role === "Admin") && e.id !== emp.id);
+  const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleSubmit = async () => {
+    setError("");
+    if (!form.firstName || !form.lastName || !form.email) {
+      setError("Prénom, nom et email sont obligatoires.");
+      return;
+    }
+    const salary = form.salary ? parseFloat(form.salary) : null;
+    if (form.salary && (isNaN(salary!) || salary! <= 0)) {
+      setError("Le salaire doit être un nombre positif.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await onSave(emp.id, {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        phone: form.phone,
+        position: form.position,
+        department: form.department,
+        contractType: form.contractType,
+        role: form.role,
+        startDate: form.startDate || null,
+        birthDate: form.birthDate || null,
+        salary,
+        manager: form.managerId || null,
+        address: form.address,
+        status: form.status,
+        ...(form.password ? { password: form.password } : {}),
+      });
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "Erreur lors de la modification.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="w-full max-w-lg rounded-2xl p-6"
+        style={{ background: "var(--hr-card)", maxHeight: "90vh", overflowY: "auto" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--hr-text)" }}>Modifier l'employé</h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>{emp.firstName} {emp.lastName}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "var(--hr-hover)" }}>
+            <X size={16} style={{ color: "var(--hr-text-muted)" }} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 p-3 rounded-xl mb-4" style={{ background: "#FEE2E2" }}>
+            <AlertCircle size={14} style={{ color: "#DC2626" }} />
+            <p className="text-xs" style={{ color: "#DC2626", fontWeight: 600 }}>{error}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          {[
+            { label: "Prénom *", key: "firstName", placeholder: "Jean" },
+            { label: "Nom *", key: "lastName", placeholder: "Dupont" },
+            { label: "Email *", key: "email", placeholder: "jean@company.com", col2: true },
+            { label: "Téléphone", key: "phone", placeholder: "+33 6 xx xx xx" },
+            { label: "Poste", key: "position", placeholder: "Ex: Développeur" },
+          ].map((f) => (
+            <div key={f.key} className={(f as any).col2 ? "col-span-2" : ""}>
+              <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>{f.label}</label>
+              <input
+                placeholder={f.placeholder}
+                value={(form as any)[f.key]}
+                onChange={(e) => set(f.key, e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+              />
+            </div>
+          ))}
+
+          <div className="col-span-2">
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Salaire mensuel (FCFA)</label>
+            <div className="relative">
+              <Euro size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#6366F1" }} />
+              <input
+                type="number"
+                placeholder="Ex: 3500"
+                value={form.salary}
+                onChange={(e) => set("salary", e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none"
+                style={{ background: "var(--hr-input-bg)", border: "1.5px solid #6366F1", color: "var(--hr-text)" }}
+              />
+            </div>
+          </div>
+
+          {[
+            { label: "Département", key: "department", options: ["Ingénierie", "RH", "Marketing", "Finance", "Direction", "Design"] },
+            { label: "Contrat", key: "contractType", options: ["CDI", "CDD", "Stage", "Freelance"] },
+            { label: "Rôle", key: "role", options: ["Employee", "Manager", "Admin"] },
+            { label: "Statut", key: "status", options: ["Actif", "Inactif", "En congé"] },
+          ].map((f) => (
+            <div key={f.key}>
+              <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>{f.label}</label>
+              <select
+                value={(form as any)[f.key]}
+                onChange={(e) => set(f.key, e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+              >
+                {f.options.map((o) => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+          ))}
+
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Date d'entrée</label>
+            <input type="date" value={form.startDate} onChange={(e) => set("startDate", e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }} />
+          </div>
+
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Date de naissance</label>
+            <input type="date" value={form.birthDate} onChange={(e) => set("birthDate", e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }} />
+          </div>
+
+          <div className="col-span-2">
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Responsable direct</label>
+            <div className="relative">
+              <Shield size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--hr-text-light)" }} />
+              <select
+                value={form.managerId}
+                onChange={(e) => set("managerId", e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none"
+                style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+              >
+                <option value="">— Aucun responsable —</option>
+                {managers.map((m) => (
+                  <option key={m.id} value={m.id}>{m.firstName} {m.lastName} ({m.role})</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="col-span-2">
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Adresse</label>
+            <input placeholder="123 Rue de la Paix" value={form.address} onChange={(e) => set("address", e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }} />
+          </div>
+
+          <div className="col-span-2">
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Nouveau mot de passe (laisser vide pour ne pas changer)</label>
+            <input type="password" placeholder="••••••••" value={form.password} onChange={(e) => set("password", e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }} />
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm"
+            style={{ border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-muted)", fontWeight: 600 }}>
+            Annuler
+          </button>
+          <button onClick={handleSubmit} disabled={loading}
+            className="flex-1 py-2.5 rounded-xl text-white text-sm hover:opacity-90 flex items-center justify-center gap-2"
+            style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700, opacity: loading ? 0.7 : 1 }}
+          >
+            {loading ? (
+              <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Enregistrement…</>
+            ) : "Enregistrer les modifications"}
           </button>
         </div>
       </motion.div>
@@ -281,6 +540,7 @@ export function EmployeesPage() {
   const [filterStatus, setFilterStatus] = useState("Tous");
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedEmpToEdit, setSelectedEmpToEdit] = useState<Employee | null>(null);
 
   const filtered = employees.filter((e) => {
     const matchSearch = `${e.firstName} ${e.lastName} ${e.email} ${e.position}`.toLowerCase().includes(search.toLowerCase());
@@ -414,10 +674,10 @@ export function EmployeesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-sm" style={{ fontWeight: 700, color: "#6366F1" }}>
-                        {emp.salary.toLocaleString("fr-FR")} €
+                        {emp.salary != null ? emp.salary.toLocaleString("fr-FR") : "—"} FCFA
                       </p>
                       <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>
-                        ~{(emp.salary / 22).toFixed(0)}€/j
+                        ~{emp.salary != null ? (emp.salary / 22).toFixed(0) : "—"} FCFA/j
                       </p>
                     </td>
                     <td className="px-4 py-3">
@@ -436,7 +696,7 @@ export function EmployeesPage() {
                         >
                           <Eye size={13} style={{ color: "#6366F1" }} />
                         </button>
-                        <button className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-amber-50 transition-colors" title="Modifier">
+                        <button onClick={() => setSelectedEmpToEdit(emp)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-amber-50 transition-colors" title="Modifier">
                           <Edit2 size={13} style={{ color: "#F59E0B" }} />
                         </button>
                         <button
@@ -479,7 +739,7 @@ export function EmployeesPage() {
                 <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#EDE9FE", color: "#7C3AED", fontWeight: 600 }}>{emp.department}</span>
                 <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: roleColor[emp.role]?.bg, color: roleColor[emp.role]?.text, fontWeight: 600 }}>{emp.role}</span>
               </div>
-              <p className="text-sm mb-3" style={{ fontWeight: 700, color: "#6366F1" }}>{emp.salary.toLocaleString("fr-FR")} €/mois</p>
+              <p className="text-sm mb-3" style={{ fontWeight: 700, color: "#6366F1" }}>{emp.salary != null ? emp.salary.toLocaleString("fr-FR") : "—"} FCFA/mois</p>
               <div className="flex gap-2 w-full">
                 <a href={`mailto:${emp.email}`} className="flex-1 py-1.5 rounded-xl flex items-center justify-center" style={{ background: "var(--hr-badge-bg)" }} onClick={(e) => e.stopPropagation()}>
                   <Mail size={12} style={{ color: "#6366F1" }} />
@@ -498,6 +758,14 @@ export function EmployeesPage() {
           <AddEmployeeModal
             onClose={() => setShowAddModal(false)}
             onAdd={addEmployee}
+            allEmployees={employees}
+          />
+        )}
+        {selectedEmpToEdit && (
+          <EditEmployeeModal
+            emp={selectedEmpToEdit}
+            onClose={() => setSelectedEmpToEdit(null)}
+            onSave={updateEmployee}
             allEmployees={employees}
           />
         )}

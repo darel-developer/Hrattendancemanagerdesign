@@ -1,67 +1,118 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
-import { Employee, employees as initialEmployees } from "../data/mockData";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { Employee, Company } from "../data/mockData";
+import { employeesApi, authApi, companiesApi } from "../services/api";
 
 interface AuthContextType {
   currentUser: Employee | null;
-  login: (email: string, password: string) => boolean;
+  currentCompany: Company | null;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
+  loading: boolean;
   employees: Employee[];
-  addEmployee: (emp: Employee) => void;
-  updateEmployee: (id: string, updates: Partial<Employee>) => void;
-  deleteEmployee: (id: string) => void;
+  addEmployee: (emp: Employee & { password?: string; pin?: string }) => Promise<void>;
+  updateEmployee: (id: string, updates: Partial<Employee> & { password?: string }) => Promise<void>;
+  deleteEmployee: (id: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  refreshCompany: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const SESSION_KEY = "hr_session";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
-  const [currentUser, setCurrentUser] = useState<Employee | null>(
-    initialEmployees[0] // Default admin for demo
-  );
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [currentUser, setCurrentUser] = useState<Employee | null>(null);
+  const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = (email: string, _password: string): boolean => {
-    const user = employees.find((e) => e.email.toLowerCase() === email.toLowerCase());
-    if (user) {
+  useEffect(() => {
+    const saved = localStorage.getItem(SESSION_KEY);
+    if (saved) {
+      try {
+        const { userId, companyId } = JSON.parse(saved);
+        Promise.all([
+          employeesApi.getAll({ companyId }),
+          companiesApi.getById(companyId),
+        ])
+          .then(([emps, company]) => {
+            setEmployees(emps);
+            setCurrentCompany(company);
+            setCurrentUser(emps.find((e) => e.id === userId) ?? null);
+          })
+          .catch(() => localStorage.removeItem(SESSION_KEY))
+          .finally(() => setLoading(false));
+      } catch {
+        localStorage.removeItem(SESSION_KEY);
+        setLoading(false);
+      }
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const user = await authApi.login(email, password);
+      const companyId = user.companyId!;
+      const [emps, company] = await Promise.all([
+        employeesApi.getAll({ companyId }),
+        companiesApi.getById(companyId),
+      ]);
       setCurrentUser(user);
+      setEmployees(emps);
+      setCurrentCompany(company);
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: user.id, companyId }));
       return true;
-    }
-    // Demo fallback
-    setCurrentUser(employees[0]);
-    return true;
-  };
-
-  const logout = () => setCurrentUser(null);
-
-  const addEmployee = (emp: Employee) => {
-    setEmployees((prev) => [...prev, emp]);
-  };
-
-  const updateEmployee = (id: string, updates: Partial<Employee>) => {
-    setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, ...updates } : e)));
-    // Also update currentUser if it's the same employee
-    if (currentUser?.id === id) {
-      setCurrentUser((prev) => prev ? { ...prev, ...updates } : prev);
+    } catch {
+      return false;
     }
   };
 
-  const deleteEmployee = (id: string) => {
+  const logout = () => {
+    setCurrentUser(null);
+    setEmployees([]);
+    setCurrentCompany(null);
+    localStorage.removeItem(SESSION_KEY);
+  };
+
+  const addEmployee = async (emp: Employee & { password?: string; pin?: string }): Promise<void> => {
+    const withCompany = { ...emp, companyId: emp.companyId || currentUser?.companyId || "COMP001" };
+    const created = await employeesApi.create(withCompany);
+    setEmployees((prev) => [...prev, created]);
+  };
+
+  const updateEmployee = async (id: string, updates: Partial<Employee> & { password?: string }): Promise<void> => {
+    const emp = employees.find((e) => e.id === id);
+    if (!emp) return;
+    const updated = await employeesApi.update(id, { ...emp, ...updates });
+    setEmployees((prev) => prev.map((e) => (e.id === id ? updated : e)));
+    if (currentUser?.id === id) setCurrentUser(updated);
+  };
+
+  const deleteEmployee = async (id: string): Promise<void> => {
+    await employeesApi.delete(id);
     setEmployees((prev) => prev.filter((e) => e.id !== id));
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+    if (!currentUser) throw new Error("Non connecté");
+    await authApi.changePassword(currentUser.id, currentPassword, newPassword);
+  };
+
+  const refreshCompany = async (): Promise<void> => {
+    if (!currentUser?.companyId) return;
+    const company = await companiesApi.getById(currentUser.companyId);
+    setCurrentCompany(company);
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        currentUser,
-        login,
-        logout,
-        isAuthenticated: !!currentUser,
-        employees,
-        addEmployee,
-        updateEmployee,
-        deleteEmployee,
-      }}
-    >
+    <AuthContext.Provider value={{
+      currentUser, currentCompany, login, logout,
+      isAuthenticated: !!currentUser, loading,
+      employees, addEmployee, updateEmployee, deleteEmployee,
+      changePassword, refreshCompany,
+    }}>
       {children}
     </AuthContext.Provider>
   );

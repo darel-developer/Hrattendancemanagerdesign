@@ -17,6 +17,8 @@ import {
   UserCircle,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
+import { TranslationKey } from "../../data/translations";
 
 interface NavItem {
   to: string;
@@ -27,17 +29,18 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord", roles: ["Admin", "Manager", "Employee"] },
-  { to: "/employees", icon: Users, label: "Employés", roles: ["Admin"] },
-  { to: "/attendance", icon: Clock, label: "Présences", roles: ["Admin", "Manager", "Employee"] },
-  { to: "/leaves", icon: CalendarDays, label: "Congés", badge: 2, roles: ["Admin", "Manager", "Employee"] },
-  { to: "/reports", icon: BarChart3, label: "Rapports", roles: ["Admin", "Manager"] },
-  { to: "/notifications", icon: Bell, label: "Notifications", badge: 4, roles: ["Admin", "Manager", "Employee"] },
+  { to: "/dashboard", icon: LayoutDashboard, label: "nav.dashboard", roles: ["Admin", "Manager", "Employee"] },
+  { to: "/employees", icon: Users, label: "nav.employees", roles: ["Admin"] },
+  { to: "/attendance", icon: Clock, label: "nav.attendance", roles: ["Admin", "Manager", "Employee"] },
+  { to: "/leaves", icon: CalendarDays, label: "nav.leaves", badge: 2, roles: ["Admin", "Manager", "Employee"] },
+  { to: "/reports", icon: BarChart3, label: "nav.reports", roles: ["Admin", "Manager"] },
+  { to: "/notifications", icon: Bell, label: "nav.notifications", badge: 4, roles: ["Admin", "Manager", "Employee"] },
 ];
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { currentUser, logout } = useAuth();
+  const { t } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -82,7 +85,7 @@ export function Sidebar() {
                 HR Manager
               </p>
               <p className="text-xs" style={{ color: "#6B7280" }}>
-                Gestion RH
+                {t("brand.subtitle")}
               </p>
             </motion.div>
           )}
@@ -114,7 +117,7 @@ export function Sidebar() {
           >
             <Shield size={12} style={{ color: roleColor }} />
             <p className="text-xs" style={{ color: roleColor, fontWeight: 700 }}>
-              {role === "Admin" ? "Administrateur" : role === "Manager" ? "Manager" : "Employé"}
+              {role === "Admin" ? t("role.admin") : role === "Manager" ? t("role.manager") : t("role.employee")}
             </p>
           </motion.div>
         )}
@@ -131,7 +134,7 @@ export function Sidebar() {
               className="px-3 mb-3 uppercase text-xs tracking-widest"
               style={{ color: "#4B5563" }}
             >
-              Navigation
+              {t("nav.section")}
             </motion.p>
           )}
         </AnimatePresence>
@@ -175,7 +178,7 @@ export function Sidebar() {
                       className="text-sm whitespace-nowrap overflow-hidden"
                       style={{ fontWeight: isActive ? 600 : 400 }}
                     >
-                      {item.label}
+                      {t(item.label as TranslationKey)}
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -216,7 +219,7 @@ export function Sidebar() {
                 exit={{ opacity: 0 }}
                 className="text-sm whitespace-nowrap"
               >
-                Paramètres
+                {t("nav.settings")}
               </motion.span>
             )}
           </AnimatePresence>

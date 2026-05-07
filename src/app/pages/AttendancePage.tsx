@@ -4,8 +4,9 @@ import {
   CheckCircle2, XCircle, Timer, MonitorSmartphone, CalendarDays,
   Clock, ChevronLeft, ChevronRight, Download, Edit3, AlertCircle, X
 } from "lucide-react";
-import { attendanceRecords, AttendanceRecord } from "../data/mockData";
+import { AttendanceRecord } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
+import { attendanceApi } from "../services/api";
 
 const statusConfig: Record<string, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
   "Présent": { bg: "#D1FAE5", text: "#16A34A", icon: <CheckCircle2 size={13} />, label: "Présent" },
@@ -16,7 +17,11 @@ const statusConfig: Record<string, { bg: string; text: string; icon: React.React
 };
 
 // ─── Employee Personal Check-In Widget ──────────────────────────────────────
-function PersonalCheckIn({ employeeId }: { employeeId: string }) {
+function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
+  employeeId: string;
+  todayRecord?: AttendanceRecord;
+  onRefresh?: () => void;
+}) {
   const [time, setTime] = useState(new Date());
   const [checkInState, setCheckInState] = useState<"none" | "in" | "out">("none");
   const [checkInTime, setCheckInTime] = useState<string>("");
@@ -25,6 +30,7 @@ function PersonalCheckIn({ employeeId }: { employeeId: string }) {
   const [manualTime, setManualTime] = useState("");
   const [note, setNote] = useState("");
   const [workMode, setWorkMode] = useState<"présentiel" | "télétravail">("présentiel");
+  const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -34,20 +40,44 @@ function PersonalCheckIn({ employeeId }: { employeeId: string }) {
   const formatTime = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   const formatTimeFull = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-  const handleCheckIn = () => {
+  const handleCheckIn = async () => {
+    const today = new Date().toISOString().split("T")[0];
     const recordedTime = showManualEntry && manualTime ? manualTime : formatTime(time);
+    const status = workMode === "télétravail" ? "Télétravail" : "Présent";
+    try {
+      const created = await attendanceApi.create({
+        employeeId,
+        date: today,
+        checkIn: recordedTime,
+        status,
+        note: note || "",
+      });
+      setSavedRecordId(created.id);
+      onRefresh?.();
+    } catch (err) {
+      console.error("Erreur pointage entrée", err);
+    }
     setCheckInTime(recordedTime);
     setCheckInState("in");
     setShowManualEntry(false);
   };
 
-  const handleCheckOut = () => {
-    setCheckOutTime(formatTime(time));
+  const handleCheckOut = async () => {
+    const outTime = formatTime(time);
+    const id = savedRecordId || todayRecord?.id;
+    if (id) {
+      try {
+        await attendanceApi.update(id, { checkOut: outTime });
+        onRefresh?.();
+      } catch (err) {
+        console.error("Erreur pointage sortie", err);
+      }
+    }
+    setCheckOutTime(outTime);
     setCheckInState("out");
   };
 
-  // Check if already checked in today
-  const todayRecord = attendanceRecords.find((r) => r.employeeId === employeeId && r.date === "2026-04-14");
+  // todayRecord comes from parent via props
 
   return (
     <motion.div
@@ -168,7 +198,7 @@ function PersonalCheckIn({ employeeId }: { employeeId: string }) {
 
         {checkInState === "in" && (
           <button
-            onClick={handleCheckOut}
+            onClick={() => void handleCheckOut()}
             className="w-full py-3.5 rounded-xl text-white transition-all hover:opacity-90 active:scale-95"
             style={{ background: "linear-gradient(135deg, #EF4444, #DC2626)", fontWeight: 700 }}
           >
@@ -278,13 +308,43 @@ function AttendanceTable({ records, employees }: { records: AttendanceRecord[]; 
 export function AttendancePage() {
   const { currentUser, employees } = useAuth();
   const role = currentUser?.role;
-  const [selectedDate, setSelectedDate] = useState("2026-04-14");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [filterStatus, setFilterStatus] = useState("Tous");
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [myTodayRecord, setMyTodayRecord] = useState<AttendanceRecord | undefined>();
+
+  useEffect(() => {
+    if (!currentUser) return;
+    if (role === "Employee") {
+      attendanceApi.getAll({ employeeId: currentUser.id }).then(setAttendanceRecords).catch(console.error);
+    } else {
+      attendanceApi.getAll({ date: selectedDate }).then(setAttendanceRecords).catch(console.error);
+      if (role === "Manager") {
+        const today = new Date().toISOString().split("T")[0];
+        attendanceApi.getAll({ employeeId: currentUser.id, date: today })
+          .then((records) => setMyTodayRecord(records[0]))
+          .catch(console.error);
+      }
+    }
+  }, [role, selectedDate, currentUser?.id]);
 
   const navigateDate = (dir: "prev" | "next") => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + (dir === "next" ? 1 : -1));
     setSelectedDate(d.toISOString().split("T")[0]);
+  };
+
+  const refreshRecords = () => {
+    if (!currentUser) return;
+    attendanceApi.getAll({ employeeId: currentUser.id }).then(setAttendanceRecords).catch(console.error);
+  };
+
+  const refreshMyRecord = () => {
+    if (!currentUser) return;
+    const today = new Date().toISOString().split("T")[0];
+    attendanceApi.getAll({ employeeId: currentUser.id, date: today })
+      .then((records) => setMyTodayRecord(records[0]))
+      .catch(console.error);
   };
 
   const statuses = ["Tous", "Présent", "Absent", "Retard", "Congé", "Télétravail"];
@@ -297,7 +357,11 @@ export function AttendancePage() {
     return (
       <div className="space-y-5">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <PersonalCheckIn employeeId={currentUser?.id ?? ""} />
+          <PersonalCheckIn
+            employeeId={currentUser?.id ?? ""}
+            todayRecord={attendanceRecords.find((r) => r.employeeId === currentUser?.id)}
+            onRefresh={refreshRecords}
+          />
 
           {/* Personal history */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -341,11 +405,10 @@ export function AttendancePage() {
     );
   }
 
-  // Admin / Manager view: table with filters
-  const allRecords = attendanceRecords.filter((r) => r.date === selectedDate);
+  // Admin / Manager view: table with filters (records already filtered by date from API)
   const visibleRecords = role === "Manager"
-    ? allRecords.filter((r) => employees.find((e) => e.id === r.employeeId && e.department === currentUser?.department))
-    : allRecords;
+    ? attendanceRecords.filter((r) => employees.find((e) => e.id === r.employeeId && e.department === currentUser?.department))
+    : attendanceRecords;
 
   const filtered = visibleRecords.filter((r) => filterStatus === "Tous" || r.status === filterStatus);
 
@@ -358,6 +421,15 @@ export function AttendancePage() {
 
   return (
     <div className="space-y-5">
+      {/* Manager personal check-in */}
+      {role === "Manager" && (
+        <PersonalCheckIn
+          employeeId={currentUser?.id ?? ""}
+          todayRecord={myTodayRecord}
+          onRefresh={refreshMyRecord}
+        />
+      )}
+
       {/* Daily summary */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}

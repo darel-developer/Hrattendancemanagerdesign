@@ -10,11 +10,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area, PieChart, Pie, Cell,
 } from "recharts";
-import {
-  attendanceRecords, leaveRequests, notifications,
-  weeklyAttendanceData, monthlyAttendanceData, departmentData
-} from "../data/mockData";
+import { AttendanceRecord, LeaveRequest } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
+import { attendanceApi, leavesApi } from "../services/api";
 
 interface StatCardProps {
   title: string;
@@ -58,20 +56,65 @@ function StatCard({ title, value, change, changeType, icon: Icon, color, bg, del
 }
 
 // ─── Admin Dashboard ─────────────────────────────────────────────────────────
+function getWeekDates(): string[] {
+  const dates: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dates.push(d.toISOString().split("T")[0]);
+  }
+  return dates;
+}
+
 function AdminDashboard() {
   const navigate = useNavigate();
   const { employees } = useAuth();
+  const [todayRecords, setTodayRecords] = useState<AttendanceRecord[]>([]);
+  const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
+  const [weekRecords, setWeekRecords] = useState<AttendanceRecord[]>([]);
+  const today = new Date().toISOString().split("T")[0];
+  const weekDates = getWeekDates();
 
-  const todayRecords = attendanceRecords.filter((r) => r.date === "2026-04-14");
+  useEffect(() => {
+    Promise.all([
+      attendanceApi.getAll({ date: today }),
+      leavesApi.getAll(),
+      attendanceApi.getAll({ startDate: weekDates[0], endDate: weekDates[6] }),
+    ])
+      .then(([att, lvs, week]) => { setTodayRecords(att); setAllLeaves(lvs); setWeekRecords(week); })
+      .catch(console.error);
+  }, [today]);
+
+  const weeklyChartData = weekDates.map((date) => {
+    const day = weekRecords.filter((r) => r.date === date);
+    return {
+      day: new Date(date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "short" }),
+      presents: day.filter((r) => r.status === "Présent" || r.status === "Télétravail").length,
+      absents: day.filter((r) => r.status === "Absent").length,
+      retards: day.filter((r) => r.status === "Retard").length,
+    };
+  });
+  const weekLabel = `${new Date(weekDates[0] + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} – ${new Date(weekDates[6] + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`;
+
   const presentCount = todayRecords.filter((r) => r.status === "Présent" || r.status === "Télétravail").length;
   const absentCount = todayRecords.filter((r) => r.status === "Absent").length;
   const lateCount = todayRecords.filter((r) => r.status === "Retard").length;
-  const pendingLeaves = leaveRequests.filter((l) => l.status === "En attente").length;
+  const pendingLeaves = allLeaves.filter((l) => l.status === "En attente").length;
   const activeEmployees = employees.filter((e) => e.status === "Actif").length;
 
-  const pendingLeavesList = leaveRequests.filter((l) => l.status === "En attente").map((l) => ({
+  const pendingLeavesList = allLeaves.filter((l) => l.status === "En attente").map((l) => ({
     ...l,
     employee: employees.find((e) => e.id === l.employeeId),
+  }));
+
+  const deptColors: Record<string, string> = {
+    "Ingénierie": "#6366F1", "RH": "#8B5CF6", "Marketing": "#EC4899",
+    "Finance": "#14B8A6", "Direction": "#F59E0B", "Design": "#10B981",
+  };
+  const deptCounts: Record<string, number> = {};
+  employees.forEach((e) => { deptCounts[e.department] = (deptCounts[e.department] || 0) + 1; });
+  const departmentData = Object.entries(deptCounts).map(([name, value]) => ({
+    name, value, color: deptColors[name] || "#6366F1",
   }));
 
   const statusColors: Record<string, string> = {
@@ -100,7 +143,7 @@ function AdminDashboard() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Présences cette semaine</p>
-              <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>7–11 Avril 2026</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>{weekLabel}</p>
             </div>
             <div className="flex items-center gap-3 text-xs">
               {[{ color: "#6366F1", label: "Présents" }, { color: "#EF4444", label: "Absents" }, { color: "#F59E0B", label: "Retards" }].map((l) => (
@@ -112,7 +155,7 @@ function AdminDashboard() {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={weeklyAttendanceData} barGap={4}>
+            <BarChart data={weeklyChartData} barGap={4}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--hr-card-border)" vertical={false} />
               <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "var(--hr-text-light)" }} />
               <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} />
@@ -241,13 +284,22 @@ function AdminDashboard() {
 function ManagerDashboard() {
   const navigate = useNavigate();
   const { currentUser, employees } = useAuth();
+  const [todayAllRecords, setTodayAllRecords] = useState<AttendanceRecord[]>([]);
+  const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
+  const today = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    Promise.all([attendanceApi.getAll({ date: today }), leavesApi.getAll()])
+      .then(([att, lvs]) => { setTodayAllRecords(att); setAllLeaves(lvs); })
+      .catch(console.error);
+  }, [today]);
 
   const myDept = currentUser?.department;
   const deptEmployees = employees.filter((e) => e.department === myDept);
-  const todayRecords = attendanceRecords.filter((r) => r.date === "2026-04-14" && deptEmployees.some((e) => e.id === r.employeeId));
+  const todayRecords = todayAllRecords.filter((r) => deptEmployees.some((e) => e.id === r.employeeId));
   const presentCount = todayRecords.filter((r) => r.status === "Présent" || r.status === "Télétravail").length;
   const absentCount = todayRecords.filter((r) => r.status === "Absent").length;
-  const deptLeavesPending = leaveRequests.filter((l) => l.status === "En attente" && deptEmployees.some((e) => e.id === l.employeeId)).length;
+  const deptLeavesPending = allLeaves.filter((l) => l.status === "En attente" && deptEmployees.some((e) => e.id === l.employeeId)).length;
 
   return (
     <div className="space-y-6">
@@ -324,15 +376,26 @@ function EmployeeDashboard() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [myRecords, setMyRecords] = useState<AttendanceRecord[]>([]);
+  const [myLeaves, setMyLeaves] = useState<LeaveRequest[]>([]);
+  const today = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  const myRecords = attendanceRecords.filter((r) => r.employeeId === currentUser?.id);
-  const todayRecord = myRecords.find((r) => r.date === "2026-04-14");
-  const myLeaves = leaveRequests.filter((l) => l.employeeId === currentUser?.id);
+  useEffect(() => {
+    if (!currentUser) return;
+    Promise.all([
+      attendanceApi.getAll({ employeeId: currentUser.id }),
+      leavesApi.getAll({ employeeId: currentUser.id }),
+    ])
+      .then(([att, lvs]) => { setMyRecords(att); setMyLeaves(lvs); })
+      .catch(console.error);
+  }, [currentUser?.id]);
+
+  const todayRecord = myRecords.find((r) => r.date === today);
   const pendingLeaves = myLeaves.filter((l) => l.status === "En attente");
   const leaveBalance = (currentUser?.leaveBalance ?? 25) - (currentUser?.leaveUsed ?? 0);
 

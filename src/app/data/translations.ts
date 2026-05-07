@@ -1,0 +1,32 @@
+export const translations = {
+  fr: {
+    "nav.dashboard": "Tableau de bord",
+    "nav.employees": "Employés",
+    "nav.attendance": "Présences",
+    "nav.leaves": "Congés",
+    "nav.reports": "Rapports",
+    "nav.notifications": "Notifications",
+    "nav.settings": "Paramètres",
+    "nav.section": "Navigation",
+    "role.admin": "Administrateur",
+    "role.manager": "Manager",
+    "role.employee": "Employé",
+    "brand.subtitle": "Gestion RH",
+  },
+  en: {
+    "nav.dashboard": "Dashboard",
+    "nav.employees": "Employees",
+    "nav.attendance": "Attendance",
+    "nav.leaves": "Leave",
+    "nav.reports": "Reports",
+    "nav.notifications": "Notifications",
+    "nav.settings": "Settings",
+    "nav.section": "Navigation",
+    "role.admin": "Administrator",
+    "role.manager": "Manager",
+    "role.employee": "Employee",
+    "brand.subtitle": "HR Management",
+  },
+} as const;
+
+export type TranslationKey = keyof typeof translations.fr;

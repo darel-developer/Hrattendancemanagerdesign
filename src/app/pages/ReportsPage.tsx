@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Download, FileText, TrendingUp, Users, Clock, CalendarDays,
@@ -8,40 +8,115 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area, PieChart, Pie, Cell, LineChart, Line,
 } from "recharts";
-import {
-  weeklyAttendanceData, monthlyAttendanceData, departmentData,
-  hoursWorkedData, employees, leaveRequests, attendanceRecords
-} from "../data/mockData";
+import { Employee, LeaveRequest, AttendanceRecord, Report } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
+import { leavesApi, attendanceApi, notificationsApi, reportsApi } from "../services/api";
 
-const absenceData = [
-  { month: "Oct", absences: 3, retards: 5 },
-  { month: "Nov", absences: 5, retards: 8 },
-  { month: "Déc", absences: 7, retards: 4 },
-  { month: "Jan", absences: 4, retards: 6 },
-  { month: "Fév", absences: 3, retards: 3 },
-  { month: "Mar", absences: 5, retards: 7 },
-  { month: "Avr", absences: 2, retards: 4 },
-];
+const LEAVE_TYPE_COLORS: Record<string, string> = {
+  "Congé annuel": "#6366F1",
+  "RTT": "#14B8A6",
+  "Maladie": "#EF4444",
+  "Exceptionnel": "#F59E0B",
+  "Congé maternité": "#EC4899",
+};
 
-const leaveTypeData = [
-  { name: "Congé annuel", value: 65, color: "#6366F1" },
-  { name: "RTT", value: 15, color: "#14B8A6" },
-  { name: "Maladie", value: 12, color: "#EF4444" },
-  { name: "Exceptionnel", value: 5, color: "#F59E0B" },
-  { name: "Maternité", value: 3, color: "#EC4899" },
-];
+function computePeriodCharts(
+  records: AttendanceRecord[],
+  leaves: LeaveRequest[],
+  empIds: string[],
+  period: "semaine" | "mois" | "trimestre"
+) {
+  const now = new Date();
+  const filtered = records.filter((r) => empIds.includes(r.employeeId));
+
+  const buildPoints = () => {
+    if (period === "semaine") {
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(now);
+        d.setDate(now.getDate() - (6 - i));
+        const dateStr = d.toISOString().split("T")[0];
+        const day = filtered.filter((r) => r.date === dateStr);
+        const total = day.length || 1;
+        const presents = day.filter((r) => r.status === "Présent").length;
+        const absences = day.filter((r) => r.status === "Absent").length;
+        const retards = day.filter((r) => r.status === "Retard").length;
+        const hours = day.reduce((s, r) => s + (r.hoursWorked ?? 0), 0);
+        return {
+          label: d.toLocaleDateString("fr-FR", { weekday: "short" }),
+          taux: day.length === 0 ? 0 : Math.round((presents / total) * 100),
+          absences,
+          retards,
+          heures: presents > 0 ? Math.round((hours / presents) * 10) / 10 : 0,
+        };
+      });
+    }
+    if (period === "mois") {
+      return Array.from({ length: 4 }, (_, i) => {
+        const wEnd = new Date(now);
+        wEnd.setDate(now.getDate() - (3 - i) * 7);
+        const wStart = new Date(wEnd);
+        wStart.setDate(wEnd.getDate() - 6);
+        const s = wStart.toISOString().split("T")[0];
+        const e = wEnd.toISOString().split("T")[0];
+        const week = filtered.filter((r) => r.date >= s && r.date <= e);
+        const total = week.length || 1;
+        const presents = week.filter((r) => r.status === "Présent").length;
+        const hours = week.reduce((s2, r) => s2 + (r.hoursWorked ?? 0), 0);
+        return {
+          label: `S${i + 1}`,
+          taux: week.length === 0 ? 0 : Math.round((presents / total) * 100),
+          absences: week.filter((r) => r.status === "Absent").length,
+          retards: week.filter((r) => r.status === "Retard").length,
+          heures: presents > 0 ? Math.round((hours / presents) * 10) / 10 : 0,
+        };
+      });
+    }
+    return Array.from({ length: 3 }, (_, i) => {
+      const d = new Date(now);
+      d.setMonth(now.getMonth() - (2 - i));
+      const month = d.toISOString().slice(0, 7);
+      const mRecs = filtered.filter((r) => r.date.startsWith(month));
+      const total = mRecs.length || 1;
+      const presents = mRecs.filter((r) => r.status === "Présent").length;
+      const hours = mRecs.reduce((s, r) => s + (r.hoursWorked ?? 0), 0);
+      return {
+        label: d.toLocaleDateString("fr-FR", { month: "short" }),
+        taux: mRecs.length === 0 ? 0 : Math.round((presents / total) * 100),
+        absences: mRecs.filter((r) => r.status === "Absent").length,
+        retards: mRecs.filter((r) => r.status === "Retard").length,
+        heures: presents > 0 ? Math.round((hours / presents) * 10) / 10 : 0,
+      };
+    });
+  };
+
+  const points = buildPoints();
+  const days = period === "semaine" ? 7 : period === "mois" ? 30 : 90;
+  const fromDate = new Date(now);
+  fromDate.setDate(now.getDate() - days);
+  const fromStr = fromDate.toISOString().split("T")[0];
+  const filteredLeaves = leaves.filter(
+    (l) => empIds.includes(l.employeeId) && l.startDate >= fromStr
+  );
+  const totalLeaves = filteredLeaves.length || 1;
+  const leaveTypeData = Object.entries(LEAVE_TYPE_COLORS).map(([name, color]) => ({
+    name,
+    value: Math.round((filteredLeaves.filter((l) => l.type === name).length / totalLeaves) * 100),
+    color,
+  })).filter((d) => d.value > 0);
+
+  return { points, leaveTypeData };
+}
 
 // ─── PDF Generator ─────────────────────────────────────────────────────────
-async function generatePDF(reportType: string) {
+async function generatePDF(reportType: string, empList: Employee[], leaveList: LeaveRequest[]) {
   const today = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-  const totalSalary = employees.reduce((s, e) => s + e.salary, 0);
-  const activeCount = employees.filter((e) => e.status === "Actif").length;
-  const pendingCount = leaveRequests.filter((l) => l.status === "En attente").length;
+  const totalSalary = empList.reduce((s, e) => s + (e.salary ?? 0), 0);
+  const activeCount = empList.filter((e) => e.status === "Actif").length;
+  const pendingCount = leaveList.filter((l) => l.status === "En attente").length;
 
   const deptStats = ["Ingénierie", "RH", "Marketing", "Finance", "Direction", "Design"].map((dept) => {
-    const emps = employees.filter((e) => e.department === dept);
-    const avgSalary = emps.length > 0 ? Math.round(emps.reduce((s, e) => s + e.salary, 0) / emps.length) : 0;
+    const emps = empList.filter((e) => e.department === dept);
+    const avgSalary = emps.length > 0 ? Math.round(emps.reduce((s, e) => s + (e.salary ?? 0), 0) / emps.length) : 0;
     const tauxMap: Record<string, number> = { Direction: 98, RH: 96, Finance: 94, Design: 91, Ingénierie: 88, Marketing: 72 };
     return { dept, count: emps.length, avgSalary, taux: tauxMap[dept] ?? 90 };
   });
@@ -90,7 +165,7 @@ async function generatePDF(reportType: string) {
         <div class="section-title">Résumé exécutif</div>
         <div class="stats-grid">
           <div class="stat-box">
-            <div class="value">${employees.length}</div>
+            <div class="value">${empList.length}</div>
             <div class="label">Total employés</div>
           </div>
           <div class="stat-box">
@@ -106,11 +181,11 @@ async function generatePDF(reportType: string) {
             <div class="label">Congés en attente</div>
           </div>
           <div class="stat-box">
-            <div class="value">${totalSalary.toLocaleString("fr-FR")} €</div>
+            <div class="value">${totalSalary.toLocaleString("fr-FR")} FCFA</div>
             <div class="label">Masse salariale</div>
           </div>
           <div class="stat-box">
-            <div class="value">${leaveRequests.filter(l => l.status === "Approuvé").length}</div>
+            <div class="value">${leaveList.filter(l => l.status === "Approuvé").length}</div>
             <div class="label">Congés approuvés</div>
           </div>
         </div>
@@ -131,7 +206,7 @@ async function generatePDF(reportType: string) {
               <tr>
                 <td><strong>${d.dept}</strong></td>
                 <td>${d.count} employé${d.count !== 1 ? "s" : ""}</td>
-                <td>${d.avgSalary.toLocaleString("fr-FR")} €</td>
+                <td>${d.avgSalary.toLocaleString("fr-FR")} FCFA</td>
                 <td>${d.taux}%</td>
                 <td><span class="badge ${d.taux >= 90 ? "badge-green" : d.taux >= 80 ? "badge-yellow" : "badge-red"}">${d.taux}/100</span></td>
               </tr>
@@ -151,13 +226,13 @@ async function generatePDF(reportType: string) {
             </tr>
           </thead>
           <tbody>
-            ${employees.filter(e => e.status === "Actif").map((e) => `
+            ${empList.filter(e => e.status === "Actif").map((e) => `
               <tr>
                 <td>${e.firstName} ${e.lastName}</td>
                 <td>${e.position}</td>
                 <td>${e.department}</td>
                 <td>${e.contractType}</td>
-                <td>${e.salary.toLocaleString("fr-FR")} €</td>
+                <td>${(e.salary ?? 0).toLocaleString("fr-FR")} FCFA</td>
               </tr>
             `).join("")}
           </tbody>
@@ -178,6 +253,69 @@ async function generatePDF(reportType: string) {
   win.document.close();
 }
 
+// ─── Read Report Modal ──────────────────────────────────────────────────────
+function ReadReportModal({ report, sender, onClose, onMarkRead }: {
+  report: Report;
+  sender?: { firstName: string; lastName: string };
+  onClose: () => void;
+  onMarkRead: () => void;
+}) {
+  useEffect(() => {
+    if (!report.isRead) {
+      reportsApi.markRead(report.id).catch(console.error);
+      onMarkRead();
+    }
+  }, [report.id]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="w-full max-w-2xl rounded-2xl p-6"
+        style={{ background: "var(--hr-card)", maxHeight: "85vh", overflowY: "auto" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex-1 min-w-0 mr-3">
+            <h2 style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--hr-text)" }}>{report.title}</h2>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--hr-badge-bg)", color: "var(--hr-badge-text)" }}>{report.type}</span>
+              <span className="text-xs" style={{ color: "var(--hr-text-light)" }}>
+                De : {sender ? `${sender.firstName} ${sender.lastName}` : report.senderId}
+              </span>
+              <span className="text-xs" style={{ color: "var(--hr-text-light)" }}>
+                · {new Date(report.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--hr-hover)" }}>
+            <X size={16} style={{ color: "var(--hr-text-muted)" }} />
+          </button>
+        </div>
+
+        <div className="rounded-xl p-4"
+          style={{ background: "var(--hr-input-bg)", border: "1px solid var(--hr-card-border-hard)", whiteSpace: "pre-wrap", color: "var(--hr-text)", fontSize: "0.875rem", lineHeight: "1.7", minHeight: 120 }}
+        >
+          {report.content}
+        </div>
+
+        <button onClick={onClose}
+          className="mt-5 w-full py-2.5 rounded-xl text-sm"
+          style={{ background: "var(--hr-hover)", color: "var(--hr-text-muted)", fontWeight: 600, border: "1px solid var(--hr-card-border-hard)" }}
+        >
+          Fermer
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── Write Report Modal ─────────────────────────────────────────────────────
 interface WriteReportModalProps {
   onClose: () => void;
@@ -185,6 +323,7 @@ interface WriteReportModalProps {
 
 function WriteReportModal({ onClose }: WriteReportModalProps) {
   const { currentUser, employees: allEmployees } = useAuth();
+  const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
   const [form, setForm] = useState({
     title: "",
     type: "Rapport de performance",
@@ -196,18 +335,40 @@ function WriteReportModal({ onClose }: WriteReportModalProps) {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    leavesApi.getAll().then(setAllLeaves).catch(console.error);
+  }, []);
+
   const recipients = allEmployees.filter((e) => e.id !== currentUser?.id);
 
   const handleSend = async () => {
     if (!form.title || !form.content || (!form.recipientId && !form.customEmail)) return;
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
+    try {
+      await reportsApi.create({
+        senderId: currentUser!.id,
+        recipientId: form.recipientId && form.recipientId !== "custom" ? form.recipientId : undefined,
+        title: form.title,
+        type: form.type,
+        content: form.content,
+      });
+      if (form.recipientId && form.recipientId !== "custom") {
+        await notificationsApi.create({
+          type: "document",
+          title: `Rapport reçu : ${form.title}`,
+          message: `${currentUser?.firstName} ${currentUser?.lastName} vous a envoyé un rapport "${form.title}". ${form.content.slice(0, 120)}${form.content.length > 120 ? "…" : ""}`,
+          employeeId: form.recipientId,
+        });
+      }
+      setSent(true);
+    } catch (err) {
+      console.error("Erreur envoi rapport:", err);
+    }
     setLoading(false);
-    setSent(true);
   };
 
   const handleExportAndSend = async () => {
-    await generatePDF(form.title || form.type);
+    await generatePDF(form.title || form.type, allEmployees, allLeaves);
     handleSend();
   };
 
@@ -345,8 +506,8 @@ function WriteReportModal({ onClose }: WriteReportModalProps) {
                   label: "Bilan mensuel",
                   content: `Rapport de présence — ${new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}\n\n` +
                     `Taux de présence global: 87%\n` +
-                    `Employés actifs: ${employees.filter(e => e.status === "Actif").length}/${employees.length}\n` +
-                    `Congés approuvés: ${leaveRequests.filter(l => l.status === "Approuvé").length}\n\n` +
+                    `Employés actifs: ${allEmployees.filter(e => e.status === "Actif").length}/${allEmployees.length}\n` +
+                    `Congés approuvés: ${allLeaves.filter(l => l.status === "Approuvé").length}\n\n` +
                     `Points d'attention:\n- Absences non justifiées à surveiller\n- Demandes de congés en attente de validation\n\nRecommandations:\n- [À compléter]`
                 },
                 {
@@ -355,7 +516,7 @@ function WriteReportModal({ onClose }: WriteReportModalProps) {
                 },
                 {
                   label: "Absences",
-                  content: `Rapport des absences — ${new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}\n\nTotal absences: 2\nAbsences justifiées: 1\nAbsences non justifiées: 1\n\nImpact financier estimé:\n${employees.filter(e => e.status === "Actif").length} employés × taux journalier moyen\n\nMesures prises:\n[À compléter]`
+                  content: `Rapport des absences — ${new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}\n\nTotal absences: 2\nAbsences justifiées: 1\nAbsences non justifiées: 1\n\nImpact financier estimé:\n${allEmployees.filter(e => e.status === "Actif").length} employés × taux journalier moyen\n\nMesures prises:\n[À compléter]`
                 },
               ].map((t) => (
                 <button
@@ -392,7 +553,7 @@ function WriteReportModal({ onClose }: WriteReportModalProps) {
             Annuler
           </button>
           <button
-            onClick={() => generatePDF(form.title || form.type)}
+            onClick={() => generatePDF(form.title || form.type, allEmployees, allLeaves)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all hover:opacity-80"
             style={{ border: "1.5px solid #6366F1", color: "#6366F1", fontWeight: 700, background: "rgba(99,102,241,0.08)" }}
           >
@@ -427,10 +588,34 @@ export function ReportsPage() {
   const [period, setPeriod] = useState<"semaine" | "mois" | "trimestre">("mois");
   const [showWriteReport, setShowWriteReport] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [receivedReports, setReceivedReports] = useState<Report[]>([]);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+
+  useEffect(() => {
+    leavesApi.getAll().then(setAllLeaves).catch(console.error);
+    attendanceApi.getAll().then(setAttendanceRecords).catch(console.error);
+    if (currentUser?.id) {
+      reportsApi.getReceived(currentUser.id).then(setReceivedReports).catch(console.error);
+    }
+  }, [currentUser?.id]);
+
+  const deptEmpIds = useMemo(() => {
+    if (role === "Admin") return allEmployees.map((e) => e.id);
+    return allEmployees
+      .filter((e) => e.department === currentUser?.department)
+      .map((e) => e.id);
+  }, [allEmployees, role, currentUser?.department]);
+
+  const { points: chartPoints, leaveTypeData } = useMemo(
+    () => computePeriodCharts(attendanceRecords, allLeaves, deptEmpIds, period),
+    [attendanceRecords, allLeaves, deptEmpIds, period]
+  );
 
   const handleExport = async (title: string) => {
     setGenerating(title);
-    await generatePDF(title);
+    await generatePDF(title, allEmployees, allLeaves);
     setGenerating(null);
   };
 
@@ -493,6 +678,70 @@ export function ReportsPage() {
         ))}
       </motion.div>
 
+      {/* Received reports inbox */}
+      {receivedReports.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+          className="rounded-2xl overflow-hidden"
+          style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}
+        >
+          <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--hr-card-border)" }}>
+            <div>
+              <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Rapports reçus</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>
+                {receivedReports.length} rapport{receivedReports.length > 1 ? "s" : ""}
+              </p>
+            </div>
+            {receivedReports.filter((r) => !r.isRead).length > 0 && (
+              <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: "#EDE9FE", color: "#6366F1", fontWeight: 700 }}>
+                {receivedReports.filter((r) => !r.isRead).length} non lu{receivedReports.filter((r) => !r.isRead).length > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <div className="p-4 space-y-2">
+            {receivedReports.map((r, i) => {
+              const sender = allEmployees.find((e) => e.id === r.senderId);
+              return (
+                <motion.div
+                  key={r.id}
+                  initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                  className="flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all hover:opacity-90"
+                  style={{
+                    background: r.isRead ? "var(--hr-hover)" : "rgba(99,102,241,0.08)",
+                    border: `1px solid ${r.isRead ? "var(--hr-card-border)" : "rgba(99,102,241,0.25)"}`,
+                  }}
+                  onClick={() => setSelectedReport(r)}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {!r.isRead && (
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#6366F1" }} />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs truncate" style={{ fontWeight: r.isRead ? 600 : 800, color: "var(--hr-text)" }}>{r.title}</p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>
+                        {sender ? `${sender.firstName} ${sender.lastName}` : r.senderId}
+                        {" · "}{new Date(r.createdAt).toLocaleDateString("fr-FR")}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                    <span className="text-xs px-2 py-0.5 rounded-full hidden sm:block" style={{ background: "var(--hr-badge-bg)", color: "var(--hr-badge-text)" }}>
+                      {r.type}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedReport(r); }}
+                      className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
+                      style={{ background: "#6366F1", color: "white", fontWeight: 700 }}
+                    >
+                      Lire
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
       {/* Period selector */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Analyses statistiques</h2>
@@ -521,14 +770,14 @@ export function ReportsPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Taux de présence</p>
-              <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>Évolution mensuelle (%)</p>
+              <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>Évolution — {period === "semaine" ? "7 derniers jours" : period === "mois" ? "4 dernières semaines" : "3 derniers mois"}</p>
             </div>
             <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "#EDE9FE" }}>
               <TrendingUp size={15} style={{ color: "#6366F1" }} />
             </div>
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={monthlyAttendanceData}>
+            <AreaChart data={chartPoints}>
               <defs>
                 <linearGradient id="taux2" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#6366F1" stopOpacity={0.15} />
@@ -536,8 +785,8 @@ export function ReportsPage() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--hr-card-border)" vertical={false} />
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} domain={[75, 100]} />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} domain={[0, 100]} />
               <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--hr-card-border-hard)", background: "var(--hr-card)", color: "var(--hr-text)" }} formatter={(v: number) => [`${v}%`, "Taux"]} />
               <Area type="monotone" dataKey="taux" stroke="#6366F1" strokeWidth={2.5} fill="url(#taux2)" dot={{ fill: "#6366F1", r: 4 }} />
             </AreaChart>
@@ -563,9 +812,9 @@ export function ReportsPage() {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={absenceData}>
+            <LineChart data={chartPoints}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--hr-card-border)" vertical={false} />
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} />
               <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} />
               <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--hr-card-border-hard)", background: "var(--hr-card)" }} />
               <Line type="monotone" dataKey="absences" stroke="#EF4444" strokeWidth={2.5} dot={{ fill: "#EF4444", r: 4 }} name="Absences" />
@@ -581,12 +830,14 @@ export function ReportsPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Heures travaillées</p>
-              <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>Moyenne par semaine</p>
+              <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>Moyenne par {period === "semaine" ? "jour" : period === "mois" ? "semaine" : "mois"}</p>
             </div>
-            <div className="px-3 py-1 rounded-full text-xs" style={{ background: "#D1FAE5", color: "#16A34A", fontWeight: 700 }}>Moy. 41.5h</div>
+            <div className="px-3 py-1 rounded-full text-xs" style={{ background: "#D1FAE5", color: "#16A34A", fontWeight: 700 }}>
+              Moy. {chartPoints.length > 0 ? (chartPoints.reduce((s, p) => s + p.heures, 0) / chartPoints.filter(p => p.heures > 0).length || 0).toFixed(1) : "0"}h
+            </div>
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={hoursWorkedData}>
+            <BarChart data={chartPoints}>
               <defs>
                 <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#6366F1" />
@@ -594,8 +845,8 @@ export function ReportsPage() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--hr-card-border)" vertical={false} />
-              <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} domain={[30, 50]} />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--hr-text-light)" }} />
               <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--hr-card-border-hard)", background: "var(--hr-card)" }} formatter={(v: number) => [`${v}h`, "Heures"]} />
               <Bar dataKey="heures" fill="url(#barGrad)" radius={[6, 6, 0, 0]} name="Heures travaillées" />
             </BarChart>
@@ -608,29 +859,35 @@ export function ReportsPage() {
         >
           <div className="mb-4">
             <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Types de congés</p>
-            <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>Répartition sur l'année</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>Répartition — {period === "semaine" ? "7 derniers jours" : period === "mois" ? "30 derniers jours" : "90 derniers jours"}</p>
           </div>
-          <div className="flex items-center gap-4">
-            <ResponsiveContainer width="50%" height={160}>
-              <PieChart>
-                <Pie data={leaveTypeData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
-                  {leaveTypeData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
-                </Pie>
-                <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--hr-card-border-hard)", background: "var(--hr-card)" }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex-1 space-y-2">
-              {leaveTypeData.map((d) => (
-                <div key={d.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
-                    <p className="text-xs" style={{ color: "var(--hr-text-sec)" }}>{d.name}</p>
-                  </div>
-                  <p className="text-xs" style={{ fontWeight: 700, color: "var(--hr-text)" }}>{d.value}%</p>
-                </div>
-              ))}
+          {leaveTypeData.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-xs" style={{ color: "var(--hr-text-muted)" }}>Aucun congé pour cette période</p>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <ResponsiveContainer width="50%" height={160}>
+                <PieChart>
+                  <Pie data={leaveTypeData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                    {leaveTypeData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--hr-card-border-hard)", background: "var(--hr-card)" }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex-1 space-y-2">
+                {leaveTypeData.map((d) => (
+                  <div key={d.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+                      <p className="text-xs" style={{ color: "var(--hr-text-sec)" }}>{d.name}</p>
+                    </div>
+                    <p className="text-xs" style={{ fontWeight: 700, color: "var(--hr-text)" }}>{d.value}%</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
       </div>
 
@@ -666,10 +923,11 @@ export function ReportsPage() {
               <tbody>
                 {allEmployees.filter(e => e.status === "Actif").map((emp, i) => {
                   const myRecords = attendanceRecords.filter(r => r.employeeId === emp.id);
-                  const unjustifiedAbsences = myRecords.filter(r => r.status === "Absent" && r.note.includes("Non justifié")).length;
-                  const dailyRate = emp.salary / 22;
+                  const unjustifiedAbsences = myRecords.filter(r => r.status === "Absent" && (r.note ?? "").includes("Non justifié")).length;
+                  const salary = emp.salary ?? 0;
+                  const dailyRate = salary / 22;
                   const deduction = unjustifiedAbsences * dailyRate;
-                  const calculated = emp.salary - deduction;
+                  const calculated = salary - deduction;
                   return (
                     <motion.tr key={emp.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.04 }}
                       className="border-b transition-colors"
@@ -682,7 +940,7 @@ export function ReportsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>{emp.salary.toLocaleString("fr-FR")} €</p>
+                        <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>{salary.toLocaleString("fr-FR")} FCFA</p>
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-sm" style={{ color: "var(--hr-text-sec)" }}>{22 - unjustifiedAbsences}/22</p>
@@ -698,12 +956,12 @@ export function ReportsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-sm" style={{ color: deduction > 0 ? "#EF4444" : "var(--hr-text-muted)", fontWeight: 600 }}>
-                          -{deduction.toFixed(0)} €
+                          -{deduction.toFixed(0)} FCFA
                         </p>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="text-sm" style={{ fontWeight: 800, color: calculated < emp.salary ? "#EF4444" : "#10B981" }}>
-                          {calculated.toLocaleString("fr-FR")} €
+                        <p className="text-sm" style={{ fontWeight: 800, color: calculated < salary ? "#EF4444" : "#10B981" }}>
+                          {calculated.toLocaleString("fr-FR")} FCFA
                         </p>
                       </td>
                     </motion.tr>
@@ -717,6 +975,15 @@ export function ReportsPage() {
 
       <AnimatePresence>
         {showWriteReport && <WriteReportModal onClose={() => setShowWriteReport(false)} />}
+        {selectedReport && (
+          <ReadReportModal
+            key={selectedReport.id}
+            report={selectedReport}
+            sender={allEmployees.find((e) => e.id === selectedReport.senderId)}
+            onClose={() => setSelectedReport(null)}
+            onMarkRead={() => setReceivedReports((prev) => prev.map((r) => r.id === selectedReport.id ? { ...r, isRead: true } : r))}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
