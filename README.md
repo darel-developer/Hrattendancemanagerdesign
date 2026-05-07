@@ -111,10 +111,10 @@ Mot de passe universel : **`admin1234`**
 | `/employees` | Liste, recherche, filtres, ajout et modification d'employés | Admin, Manager |
 | `/employees/:id` | Détail complet d'un employé (infos, historique de présence, congés) | Admin, Manager |
 | `/attendance` | Pointages journaliers avec navigation par date, filtres, stats | Tous |
-| `/leaves` | Demandes de congé : soumission, approbation / refus, solde | Tous |
-| `/reports` | Rapports persistés, boîte de réception, graphiques filtrables, export PDF | Admin, Manager |
-| `/notifications` | Centre de notifications : lire, supprimer, tout marquer lu | Tous |
-| `/settings` | Profil, changement de mot de passe, configuration entreprise | Tous |
+| `/leaves` | Demandes de congé : soumission, approbation / refus, solde — **mise à jour automatique** | Tous |
+| `/reports` | Rapports persistés, boîte de réception, graphiques filtrables, export PDF — **vue simplifiée pour Employé** | Tous |
+| `/notifications` | Centre de notifications : lire, supprimer, tout marquer lu — **mise à jour automatique** | Tous |
+| `/settings` | Profil, changement de mot de passe, configuration entreprise, **préférences de notifications persistées** | Tous |
 
 ### Pages spéciales
 
@@ -145,6 +145,7 @@ Mot de passe universel : **`admin1234`**
 - **Manager** : widget de pointage personnel **en haut de page** + tableau de présence de son département
 - **Admin** : tableau de présence de toute l'entreprise avec navigation par date, statistiques (présents / absents / retards / congés), filtre par statut
 - Calcul automatique des heures travaillées à la sortie
+- **Restauration d'état après reconnexion** : si l'utilisateur avait déjà pointé son entrée avant de se déconnecter, le widget reprend l'état correct (bouton "Sortie" visible) sans re-créer de doublon
 
 ### Congés
 - Soumission d'une demande (type, dates, motif) avec calcul automatique des jours
@@ -152,13 +153,15 @@ Mot de passe universel : **`admin1234`**
 - Approbation / refus par Admin ou Manager avec commentaire
 - Mise à jour du solde de congés restants
 - Filtres par statut, type, département
+- **Mise à jour dynamique** : la liste se rafraîchit automatiquement toutes les 30 secondes sans rechargement de page
 
 ### Rapports
 - **Rédaction et envoi** : titre, type, contenu libre, modèles rapides (bilan mensuel, performance, absences)
 - **Persistance en base de données** : chaque rapport envoyé est stocké dans la table `reports`
 - **Boîte de réception** : section "Rapports reçus" affichant tous les rapports adressés à l'utilisateur connecté, avec indicateur de non-lus
 - **Lecture complète** : modal d'affichage du contenu intégral avec marquage automatique comme lu
-- **Graphiques filtrables** par période (semaine / mois / trimestre) calculés depuis les données réelles :
+- **Vue Employé** : un employé peut envoyer un rapport uniquement à son manager (destinataire verrouillé automatiquement), voir ses rapports envoyés et reçus dans une liste chronologique
+- **Graphiques filtrables** par période (semaine / mois / trimestre) calculés depuis les données réelles (Admin / Manager uniquement) :
   - Taux de présence (courbe aire)
   - Absences & retards (courbe ligne)
   - Heures travaillées (barres)
@@ -170,6 +173,11 @@ Mot de passe universel : **`admin1234`**
 - Types : absence, congé, document, retard, système
 - Marquage individuel ou global comme lu
 - Suppression individuelle ou totale
+- **Mise à jour automatique** : la liste et les badges se rafraîchissent toutes les 30 secondes sans rechargement de page
+- **Filtrage par utilisateur** : un Employé ne voit que ses propres notifications (et les notifications système), jamais celles des autres employés
+- **Badges dynamiques** dans la sidebar : disparaissent automatiquement dès que tout est lu
+- **Préférences** (Settings > Notifications) : chaque type de notification peut être activé / désactivé individuellement, réglage persisté dans le navigateur
+- **Recherche globale** dans le header : barre de recherche avec dropdown affichant les employés correspondants (nom, département, poste), navigation directe vers la fiche au clic
 - **Notifications automatiques serveur** :
   - Chaque jour à 09h30 : détection des employés actifs sans pointage → création d'une notification d'absence (doublon évité)
   - Le 1er de chaque mois à 08h00 : envoi d'un rapport mensuel de présence aux administrateurs de chaque entreprise
@@ -193,6 +201,9 @@ Mot de passe universel : **`admin1234`**
 ## Architecture du projet
 
 ```
+├── src/app/components/
+│   └── AppLogo.tsx              # Logo SVG dégradé indigo/violet de l'application
+│
 ├── server/                      # Backend Express.js
 │   ├── routes/
 │   │   ├── auth.js              # Login, changement de mot de passe

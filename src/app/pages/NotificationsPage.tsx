@@ -37,8 +37,18 @@ export function NotificationsPage() {
   const [filter, setFilter] = useState<"Tous" | "Non lus" | "absence" | "conge" | "document" | "retard" | "system">("Tous");
 
   useEffect(() => {
-    notificationsApi.getAll(currentUser?.companyId ?? undefined).then(setNotifs).catch(console.error);
-  }, [currentUser?.companyId]);
+    const fetchNotifs = () => {
+      notificationsApi.getAll(currentUser?.companyId ?? undefined).then((raw) => {
+        const filtered = currentUser?.role === "Employee"
+          ? raw.filter((n) => n.employeeId === currentUser.id || n.employeeId === null)
+          : raw;
+        setNotifs(filtered);
+      }).catch(console.error);
+    };
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser?.companyId, currentUser?.id]);
 
   const filtered = notifs.filter((n) => {
     if (filter === "Tous") return true;

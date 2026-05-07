@@ -37,10 +37,31 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
     return () => clearInterval(t);
   }, []);
 
+  // Restore state from DB record after re-login
+  useEffect(() => {
+    if (!todayRecord) return;
+    setSavedRecordId(todayRecord.id);
+    if (todayRecord.checkOut) {
+      setCheckInTime(todayRecord.checkIn ?? "");
+      setCheckOutTime(todayRecord.checkOut);
+      setCheckInState("out");
+    } else if (todayRecord.checkIn) {
+      setCheckInTime(todayRecord.checkIn);
+      setCheckInState("in");
+    }
+  }, [todayRecord?.id, todayRecord?.checkOut]);
+
   const formatTime = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   const formatTimeFull = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   const handleCheckIn = async () => {
+    // Guard against double check-in
+    if (todayRecord?.checkIn) {
+      setCheckInTime(todayRecord.checkIn);
+      setSavedRecordId(todayRecord.id);
+      setCheckInState("in");
+      return;
+    }
     const today = new Date().toISOString().split("T")[0];
     const recordedTime = showManualEntry && manualTime ? manualTime : formatTime(time);
     const status = workMode === "télétravail" ? "Télétravail" : "Présent";
@@ -359,7 +380,7 @@ export function AttendancePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PersonalCheckIn
             employeeId={currentUser?.id ?? ""}
-            todayRecord={attendanceRecords.find((r) => r.employeeId === currentUser?.id)}
+            todayRecord={attendanceRecords.find((r) => r.employeeId === currentUser?.id && r.date === new Date().toISOString().split("T")[0])}
             onRefresh={refreshRecords}
           />
 

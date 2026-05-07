@@ -319,16 +319,17 @@ function ReadReportModal({ report, sender, onClose, onMarkRead }: {
 // ─── Write Report Modal ─────────────────────────────────────────────────────
 interface WriteReportModalProps {
   onClose: () => void;
+  fixedRecipientId?: string;
 }
 
-function WriteReportModal({ onClose }: WriteReportModalProps) {
+function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) {
   const { currentUser, employees: allEmployees } = useAuth();
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
   const [form, setForm] = useState({
     title: "",
     type: "Rapport de performance",
     content: "",
-    recipientId: "",
+    recipientId: fixedRecipientId ?? "",
     customEmail: "",
     includeData: true,
   });
@@ -455,20 +456,27 @@ function WriteReportModal({ onClose }: WriteReportModalProps) {
             </div>
             <div>
               <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Destinataire *</label>
-              <select
-                value={form.recipientId}
-                onChange={(e) => setForm(p => ({ ...p, recipientId: e.target.value, customEmail: "" }))}
-                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
-              >
-                <option value="">— Sélectionner un destinataire —</option>
-                {recipients.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.firstName} {r.lastName} ({r.role} — {r.department})
-                  </option>
-                ))}
-                <option value="custom">Adresse email personnalisée…</option>
-              </select>
+              {fixedRecipientId ? (
+                <div className="w-full px-3 py-2.5 rounded-xl text-sm flex items-center gap-2"
+                  style={{ background: "rgba(99,102,241,0.08)", border: "1.5px solid rgba(99,102,241,0.3)", color: "var(--hr-text)" }}>
+                  {(() => { const r = allEmployees.find(e => e.id === fixedRecipientId); return r ? `${r.firstName} ${r.lastName} (${r.role})` : fixedRecipientId; })()}
+                </div>
+              ) : (
+                <select
+                  value={form.recipientId}
+                  onChange={(e) => setForm(p => ({ ...p, recipientId: e.target.value, customEmail: "" }))}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                  style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+                >
+                  <option value="">— Sélectionner un destinataire —</option>
+                  {recipients.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.firstName} {r.lastName} ({r.role} — {r.department})
+                    </option>
+                  ))}
+                  <option value="custom">Adresse email personnalisée…</option>
+                </select>
+              )}
             </div>
             {form.recipientId === "custom" && (
               <div className="col-span-2">
@@ -591,6 +599,7 @@ export function ReportsPage() {
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [receivedReports, setReceivedReports] = useState<Report[]>([]);
+  const [sentReports, setSentReports] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
   useEffect(() => {
@@ -598,6 +607,7 @@ export function ReportsPage() {
     attendanceApi.getAll().then(setAttendanceRecords).catch(console.error);
     if (currentUser?.id) {
       reportsApi.getReceived(currentUser.id).then(setReceivedReports).catch(console.error);
+      reportsApi.getSent(currentUser.id).then(setSentReports).catch(console.error);
     }
   }, [currentUser?.id]);
 
@@ -630,6 +640,135 @@ export function ReportsPage() {
         { title: "Rapport de présence", subtitle: `Département ${currentUser?.department}`, icon: Clock, color: "#6366F1", bg: "#EDE9FE" },
         { title: "Rapport d'équipe", subtitle: "Votre département", icon: Users, color: "#10B981", bg: "#D1FAE5" },
       ];
+
+  // ─── Employee view ────────────────────────────────────────────────────────
+  if (role === "Employee") {
+    const myManager = allEmployees.find((e) => e.id === currentUser?.manager);
+    const refreshReports = () => {
+      if (!currentUser?.id) return;
+      reportsApi.getReceived(currentUser.id).then(setReceivedReports).catch(console.error);
+      reportsApi.getSent(currentUser.id).then(setSentReports).catch(console.error);
+    };
+    const allMyReports = [
+      ...receivedReports.map(r => ({ ...r, dir: "received" as const })),
+      ...sentReports.map(r => ({ ...r, dir: "sent" as const })),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return (
+      <div className="space-y-5 max-w-2xl">
+        {/* Header card */}
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl p-5"
+          style={{ background: "linear-gradient(135deg, #0B1437, #1E1B4B)", border: "1px solid rgba(99,102,241,0.3)" }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-white" style={{ fontWeight: 700 }}>Mes rapports</p>
+              <p className="text-xs mt-1" style={{ color: "#94A3B8" }}>
+                {myManager
+                  ? `Manager : ${myManager.firstName} ${myManager.lastName} (${myManager.department})`
+                  : "Aucun manager assigné"}
+              </p>
+            </div>
+            {myManager && (
+              <button
+                onClick={() => setShowWriteReport(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm hover:opacity-90 transition-all"
+                style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
+              >
+                <Edit3 size={14} />
+                Envoyer un rapport
+              </button>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Reports list */}
+        {allMyReports.length === 0 ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="py-16 text-center rounded-2xl"
+            style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)" }}
+          >
+            <FileText size={40} style={{ color: "var(--hr-text-light)" }} className="mx-auto mb-3" />
+            <p style={{ color: "var(--hr-text-muted)" }}>Aucun rapport pour l'instant</p>
+          </motion.div>
+        ) : (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}
+          >
+            <div className="px-5 py-4 border-b" style={{ borderColor: "var(--hr-card-border)" }}>
+              <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>
+                Tous mes rapports ({allMyReports.length})
+              </p>
+            </div>
+            <div className="p-4 space-y-2">
+              {allMyReports.map((r, i) => {
+                const other = allEmployees.find((e) => e.id === (r.dir === "sent" ? r.recipientId : r.senderId));
+                return (
+                  <motion.div key={r.id}
+                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                    className="flex items-center justify-between p-3 rounded-xl cursor-pointer hover:opacity-90 transition-all"
+                    style={{
+                      background: !r.isRead && r.dir === "received" ? "rgba(99,102,241,0.08)" : "var(--hr-hover)",
+                      border: `1px solid ${!r.isRead && r.dir === "received" ? "rgba(99,102,241,0.25)" : "var(--hr-card-border)"}`,
+                    }}
+                    onClick={() => r.dir === "received" && setSelectedReport(r)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {!r.isRead && r.dir === "received" && (
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#6366F1" }} />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs truncate" style={{ fontWeight: !r.isRead && r.dir === "received" ? 800 : 600, color: "var(--hr-text)" }}>
+                          {r.title}
+                        </p>
+                        <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>
+                          {r.dir === "sent" ? `Envoyé à ${other ? `${other.firstName} ${other.lastName}` : "—"}` : `De ${other ? `${other.firstName} ${other.lastName}` : "—"}`}
+                          {" · "}{new Date(r.createdAt).toLocaleDateString("fr-FR")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                      <span className="text-xs px-2 py-0.5 rounded-full"
+                        style={{ background: r.dir === "sent" ? "#D1FAE5" : "#EDE9FE", color: r.dir === "sent" ? "#16A34A" : "#6366F1", fontWeight: 700 }}>
+                        {r.dir === "sent" ? "Envoyé" : "Reçu"}
+                      </span>
+                      {r.dir === "received" && (
+                        <button onClick={() => setSelectedReport(r)}
+                          className="text-xs px-3 py-1.5 rounded-lg hover:opacity-80"
+                          style={{ background: "#6366F1", color: "white", fontWeight: 700 }}>
+                          Lire
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        <AnimatePresence>
+          {showWriteReport && myManager && (
+            <WriteReportModal
+              onClose={() => { setShowWriteReport(false); refreshReports(); }}
+              fixedRecipientId={myManager.id}
+            />
+          )}
+          {selectedReport && (
+            <ReadReportModal
+              key={selectedReport.id}
+              report={selectedReport}
+              sender={allEmployees.find((e) => e.id === selectedReport.senderId)}
+              onClose={() => setSelectedReport(null)}
+              onMarkRead={() => setReceivedReports((prev) => prev.map((r) => r.id === selectedReport.id ? { ...r, isRead: true } : r))}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

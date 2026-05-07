@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { Bell, Search, ChevronDown, Moon, Sun, Menu } from "lucide-react";
+import { Bell, Search, ChevronDown, Moon, Sun, Menu, X } from "lucide-react";
 import { useLayout } from "../../context/LayoutContext";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../../context/AuthContext";
@@ -39,21 +39,42 @@ const roleSubtitles: Record<string, Record<string, string>> = {
 export function Header() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, employees } = useAuth();
   const { toggleTheme, isDark } = useTheme();
   const { setMobileOpen } = useLayout();
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [searchVal, setSearchVal] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    notificationsApi.getAll().then(setNotifications).catch(() => {});
-  }, [location.pathname]);
+    const fetchNotifs = () => {
+      notificationsApi.getAll(currentUser?.companyId ?? undefined).then(setNotifications).catch(() => {});
+    };
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser?.id]);
 
   const role = currentUser?.role ?? "Employee";
   const pageInfo = pageTitles[location.pathname] ?? { title: "HR Manager", subtitle: "" };
   const roleSubtitle = roleSubtitles[location.pathname]?.[role] ?? pageInfo.subtitle;
-  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Filter notifications for current user
+  const userNotifs = notifications.filter((n) =>
+    role === "Admin" || role === "Manager" || n.employeeId === currentUser?.id || n.employeeId === null
+  );
+  const unreadCount = userNotifs.filter((n) => !n.read).length;
+
+  // Search results
+  const searchResults = searchVal.trim().length >= 2
+    ? employees.filter((e) =>
+        `${e.firstName} ${e.lastName}`.toLowerCase().includes(searchVal.toLowerCase()) ||
+        e.email.toLowerCase().includes(searchVal.toLowerCase()) ||
+        e.department.toLowerCase().includes(searchVal.toLowerCase())
+      ).slice(0, 5)
+    : [];
 
   const today = new Date();
   const dateStr = today.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -84,13 +105,54 @@ export function Header() {
       {/* Right */}
       <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
         {/* Search — hidden on mobile */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl"
+        <div ref={searchRef} className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl relative"
           style={{ background: "var(--hr-input-bg)", border: "1px solid var(--hr-card-border-hard)" }}>
           <Search size={14} style={{ color: "var(--hr-text-light)" }} />
-          <input type="text" placeholder="Rechercher…" value={searchVal}
+          <input type="text" placeholder="Rechercher un employé…" value={searchVal}
             onChange={(e) => setSearchVal(e.target.value)}
-            className="bg-transparent text-sm outline-none w-40"
+            onFocus={() => setShowSearch(true)}
+            onBlur={() => setTimeout(() => setShowSearch(false), 200)}
+            className="bg-transparent text-sm outline-none w-44"
             style={{ color: "var(--hr-text)" }} />
+          {searchVal && (
+            <button onClick={() => { setSearchVal(""); setShowSearch(false); }}>
+              <X size={12} style={{ color: "var(--hr-text-light)" }} />
+            </button>
+          )}
+          <AnimatePresence>
+            {showSearch && searchVal.trim().length >= 2 && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.12 }}
+                className="absolute top-full mt-2 left-0 w-72 rounded-xl shadow-2xl overflow-hidden z-50"
+                style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border-hard)" }}
+              >
+                {searchResults.length === 0 ? (
+                  <p className="px-4 py-3 text-xs" style={{ color: "var(--hr-text-muted)" }}>
+                    Aucun résultat pour « {searchVal} »
+                  </p>
+                ) : (
+                  searchResults.map((emp) => (
+                    <div key={emp.id}
+                      className="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-all"
+                      style={{ borderBottom: "1px solid var(--hr-card-border)" }}
+                      onMouseDown={() => { navigate(`/employees/${emp.id}`); setSearchVal(""); setShowSearch(false); }}
+                    >
+                      <img src={emp.avatar} alt={emp.firstName} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                      <div>
+                        <p className="text-xs" style={{ fontWeight: 700, color: "var(--hr-text)" }}>
+                          {emp.firstName} {emp.lastName}
+                        </p>
+                        <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>
+                          {emp.department} · {emp.position}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Theme toggle */}
@@ -133,10 +195,10 @@ export function Header() {
                   )}
                 </div>
                 <div className="max-h-72 overflow-y-auto">
-                  {notifications.length === 0 ? (
+                  {userNotifs.length === 0 ? (
                     <p className="px-4 py-6 text-xs text-center" style={{ color: "var(--hr-text-muted)" }}>Aucune notification</p>
                   ) : (
-                    notifications.slice(0, 5).map((n) => (
+                    userNotifs.slice(0, 5).map((n) => (
                       <div key={n.id}
                         className="flex items-start gap-3 px-4 py-3 border-b cursor-pointer transition-colors"
                         style={{

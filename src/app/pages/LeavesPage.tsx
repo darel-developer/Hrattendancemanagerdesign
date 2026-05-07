@@ -260,7 +260,12 @@ export function LeavesPage() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
 
   useEffect(() => {
-    leavesApi.getAll({ companyId: currentUser?.companyId ?? undefined }).then(setLeaves).catch(console.error);
+    const fetchLeaves = () => {
+      leavesApi.getAll({ companyId: currentUser?.companyId ?? undefined }).then(setLeaves).catch(console.error);
+    };
+    fetchLeaves();
+    const interval = setInterval(fetchLeaves, 30000);
+    return () => clearInterval(interval);
   }, [currentUser?.companyId]);
 
   // Role-based filtering

@@ -24,9 +24,19 @@ export function SettingsPage() {
   const { theme, setTheme, language, setLanguage, isDark } = useTheme();
   const [activeSection, setActiveSection] = useState("profile");
   const [saved, setSaved] = useState(false);
-  const [notifSettings, setNotifSettings] = useState({
-    absences: true, retards: true, conges: true, documents: true, email: false, system: true,
+  const [notifSettings, setNotifSettings] = useState(() => {
+    try {
+      const s = localStorage.getItem("hr_notif_settings");
+      if (s) return { absences: true, retards: true, conges: true, documents: true, email: false, system: true, ...JSON.parse(s) };
+    } catch {}
+    return { absences: true, retards: true, conges: true, documents: true, email: false, system: true };
   });
+
+  const updateNotifSetting = (key: string, value: boolean) => {
+    const next = { ...notifSettings, [key]: value };
+    setNotifSettings(next);
+    localStorage.setItem("hr_notif_settings", JSON.stringify(next));
+  };
 
   // Photo modal
   const [showPhotoModal, setShowPhotoModal] = useState(false);
@@ -323,7 +333,7 @@ export function SettingsPage() {
                     <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>{item.desc}</p>
                   </div>
                   <button
-                    onClick={() => setNotifSettings((p) => ({ ...p, [item.key]: !p[item.key as keyof typeof p] }))}
+                    onClick={() => updateNotifSetting(item.key, !notifSettings[item.key as keyof typeof notifSettings])}
                     className="w-11 h-6 rounded-full transition-all relative flex-shrink-0"
                     style={{ background: notifSettings[item.key as keyof typeof notifSettings] ? "#6366F1" : "var(--hr-card-border-hard)" }}>
                     <motion.div

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -18,13 +18,14 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { notificationsApi, leavesApi } from "../../services/api";
 import { TranslationKey } from "../../data/translations";
+import { AppLogo } from "../AppLogo";
 
 interface NavItem {
   to: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   label: string;
-  badge?: number;
   roles: Array<"Admin" | "Manager" | "Employee">;
 }
 
@@ -32,16 +33,45 @@ const allNavItems: NavItem[] = [
   { to: "/dashboard", icon: LayoutDashboard, label: "nav.dashboard", roles: ["Admin", "Manager", "Employee"] },
   { to: "/employees", icon: Users, label: "nav.employees", roles: ["Admin"] },
   { to: "/attendance", icon: Clock, label: "nav.attendance", roles: ["Admin", "Manager", "Employee"] },
-  { to: "/leaves", icon: CalendarDays, label: "nav.leaves", badge: 2, roles: ["Admin", "Manager", "Employee"] },
-  { to: "/reports", icon: BarChart3, label: "nav.reports", roles: ["Admin", "Manager"] },
-  { to: "/notifications", icon: Bell, label: "nav.notifications", badge: 4, roles: ["Admin", "Manager", "Employee"] },
+  { to: "/leaves", icon: CalendarDays, label: "nav.leaves", roles: ["Admin", "Manager", "Employee"] },
+  { to: "/reports", icon: BarChart3, label: "nav.reports", roles: ["Admin", "Manager", "Employee"] },
+  { to: "/notifications", icon: Bell, label: "nav.notifications", roles: ["Admin", "Manager", "Employee"] },
 ];
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const { currentUser, logout } = useAuth();
+  const [dynamicBadges, setDynamicBadges] = useState<Record<string, number>>({});
+  const { currentUser, logout, employees } = useAuth();
   const { t } = useTheme();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const fetchCounts = async () => {
+      try {
+        const [notifs, leaves] = await Promise.all([
+          notificationsApi.getAll(currentUser.companyId ?? undefined),
+          leavesApi.getAll({ companyId: currentUser.companyId ?? undefined }),
+        ]);
+        const userNotifs = notifs.filter((n) =>
+          currentUser.role === "Admin" || currentUser.role === "Manager" ||
+          n.employeeId === currentUser.id || n.employeeId === null
+        );
+        const unread = userNotifs.filter((n) => !n.read).length;
+        let pendingLeaves = 0;
+        if (currentUser.role === "Admin") {
+          pendingLeaves = leaves.filter((l) => l.status === "En attente").length;
+        } else if (currentUser.role === "Manager") {
+          const deptIds = employees.filter((e) => e.department === currentUser.department).map((e) => e.id);
+          pendingLeaves = leaves.filter((l) => l.status === "En attente" && deptIds.includes(l.employeeId)).length;
+        }
+        setDynamicBadges({ "/notifications": unread, "/leaves": pendingLeaves });
+      } catch {}
+    };
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser?.id]);
 
   const handleLogout = () => {
     logout();
@@ -66,11 +96,8 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-white/5">
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)" }}
-        >
-          <Building2 size={18} className="text-white" />
+        <div className="flex-shrink-0">
+          <AppLogo size={36} />
         </div>
         <AnimatePresence>
           {!collapsed && (
@@ -182,17 +209,17 @@ export function Sidebar() {
                     </motion.span>
                   )}
                 </AnimatePresence>
-                {item.badge && !collapsed && (
+                {(dynamicBadges[item.to] ?? 0) > 0 && !collapsed && (
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     className="ml-auto text-xs px-1.5 py-0.5 rounded-full text-white"
                     style={{ background: "#EF4444", minWidth: "18px", textAlign: "center" }}
                   >
-                    {item.badge}
+                    {dynamicBadges[item.to]}
                   </motion.span>
                 )}
-                {item.badge && collapsed && (
+                {(dynamicBadges[item.to] ?? 0) > 0 && collapsed && (
                   <span
                     className="absolute top-1 right-1 w-2 h-2 rounded-full"
                     style={{ background: "#EF4444" }}
