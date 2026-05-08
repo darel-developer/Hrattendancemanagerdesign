@@ -395,7 +395,7 @@ export function PlanningPage() {
               {weekDates.map((date) => {
                 const shift = getShift(emp.id, date);
                 const isToday = date === new Date().toISOString().split("T")[0];
-                const colors = shift ? SHIFT_COLORS[shift.shiftType] : null;
+                const colors = shift ? (SHIFT_COLORS[shift.shiftType] ?? SHIFT_COLORS["Matin"]) : null;
 
                 return (
                   <div
