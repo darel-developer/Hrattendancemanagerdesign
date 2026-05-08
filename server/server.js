@@ -3,6 +3,9 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+const { securityHeaders, authLimiter, kioskLimiter, superadminLimiter, generalLimiter } = require('./security');
+const { runBackup, scheduleDaily } = require('./backup');
+
 const employeesRouter = require('./routes/employees');
 const attendanceRouter = require('./routes/attendance');
 const leavesRouter = require('./routes/leaves');
@@ -20,23 +23,52 @@ const db = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:5174'], credentials: true }));
-app.use(express.json());
+// ─── Headers de sécurité (toutes les réponses) ────────────────────────────────
+app.use(securityHeaders);
 
+// ─── CORS — origines autorisées uniquement ────────────────────────────────────
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5174')
+  .split(',').map((o) => o.trim());
+app.use(cors({
+  origin: (origin, cb) => {
+    // Autoriser les requêtes sans origin (ex: outils CLI, tests)
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error('Origine non autorisée'));
+  },
+  credentials: true,
+}));
+
+// ─── Parsing JSON — taille limitée à 50kb ─────────────────────────────────────
+app.use(express.json({ limit: '50kb' }));
+app.use(express.urlencoded({ limit: '50kb', extended: false }));
+
+// ─── Rate limiting global ─────────────────────────────────────────────────────
+app.use('/api', generalLimiter);
+
+// ─── Routes avec rate limiters spécifiques ────────────────────────────────────
+app.use('/api/auth', authLimiter, authRouter);
+app.use('/api/kiosk', kioskLimiter, kioskRouter);
+app.use('/api/superadmin', superadminLimiter, superadminRouter);
+
+// ─── Routes standard ──────────────────────────────────────────────────────────
 app.use('/api/employees', employeesRouter);
 app.use('/api/attendance', attendanceRouter);
 app.use('/api/leaves', leavesRouter);
 app.use('/api/notifications', notificationsRouter);
-app.use('/api/auth', authRouter);
 app.use('/api/companies', companiesRouter);
-app.use('/api/kiosk', kioskRouter);
-app.use('/api/superadmin', superadminRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/performance', performanceRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/planning', planningRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
+// ─── Gestionnaire d'erreurs global ────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, _next) => {
+  console.error('[Error]', err.message);
+  res.status(err.status || 500).json({ error: 'Erreur serveur' });
+});
 
 // ─── Auto Notification Scheduler ──────────────────────────────────────────────
 
@@ -171,4 +203,24 @@ app.listen(PORT, async () => {
     console.error('[DB] Erreur création table reports :', err.message);
   }
   scheduleAutoNotifications();
+
+  // ─── Backup automatique ──────────────────────────────────────────────────
+  if (process.env.AUTO_BACKUP !== 'false') {
+    // Backup immédiat au démarrage si le dernier date de plus de 24h
+    const backupDir = require('path').join(__dirname, 'backups');
+    const fs = require('fs');
+    let doStartupBackup = true;
+    if (fs.existsSync(backupDir)) {
+      const files = fs.readdirSync(backupDir).filter((f) => f.endsWith('.sql')).sort();
+      if (files.length > 0) {
+        const lastFile = files[files.length - 1];
+        const lastMtime = fs.statSync(require('path').join(backupDir, lastFile)).mtimeMs;
+        if (Date.now() - lastMtime < 24 * 60 * 60 * 1000) doStartupBackup = false;
+      }
+    }
+    if (doStartupBackup) {
+      runBackup().catch((err) => console.error('[Backup] Erreur démarrage :', err.message));
+    }
+    scheduleDaily();
+  }
 });

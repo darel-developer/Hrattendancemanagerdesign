@@ -26,8 +26,8 @@ router.get('/', async (req, res) => {
     query += companyId ? ' ORDER BY ed.created_at DESC' : ' ORDER BY created_at DESC';
     const [rows] = await db.query(query, params);
     res.json(rows.map(mapDocument));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -46,8 +46,8 @@ router.post('/', async (req, res) => {
     );
     const [rows] = await db.query('SELECT * FROM employee_documents WHERE id = ?', [id]);
     res.status(201).json(mapDocument(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -67,8 +67,8 @@ router.put('/:id', async (req, res) => {
     const [rows] = await db.query('SELECT * FROM employee_documents WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Document non trouvé' });
     res.json(mapDocument(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -76,8 +76,8 @@ router.delete('/:id', async (req, res) => {
   try {
     await db.query('DELETE FROM employee_documents WHERE id = ?', [req.params.id]);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

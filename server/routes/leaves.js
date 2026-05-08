@@ -31,8 +31,8 @@ router.get('/', async (req, res) => {
     query += companyId ? ' ORDER BY lr.request_date DESC' : ' ORDER BY request_date DESC';
     const [rows] = await db.query(query, params);
     res.json(rows.map(mapLeave));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -54,8 +54,8 @@ router.post('/', async (req, res) => {
     );
     const [rows] = await db.query('SELECT * FROM leave_requests WHERE id = ?', [id]);
     res.status(201).json(mapLeave(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -71,8 +71,8 @@ router.put('/:id', async (req, res) => {
     const [rows] = await db.query('SELECT * FROM leave_requests WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Congé non trouvé' });
     res.json(mapLeave(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

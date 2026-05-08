@@ -28,8 +28,29 @@ function mapEmployee(row) {
     birthDate: row.birth_date || null,
     leaveBalance: row.leave_balance,
     leaveUsed: row.leave_used,
-    pin: row.pin || null,
+    // PIN intentionnellement exclu des réponses API
   };
+}
+
+// Valeurs acceptées pour les champs enum
+const VALID_ROLES = ['Admin', 'Manager', 'Employee'];
+const VALID_DEPTS = ['Ingénierie', 'RH', 'Marketing', 'Finance', 'Direction', 'Design'];
+const VALID_CONTRACTS = ['CDI', 'CDD', 'Stage', 'Freelance'];
+const VALID_STATUSES = ['Actif', 'Inactif', 'En congé'];
+
+function validateEmployee(e) {
+  if (!e.firstName || typeof e.firstName !== 'string' || e.firstName.length > 100) return 'Prénom invalide';
+  if (!e.lastName  || typeof e.lastName  !== 'string' || e.lastName.length  > 100) return 'Nom invalide';
+  if (!e.email     || typeof e.email     !== 'string' || e.email.length > 255)      return 'Email invalide';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email))                                 return 'Format email invalide';
+  if (e.role       && !VALID_ROLES.includes(e.role))       return 'Rôle invalide';
+  if (e.department && !VALID_DEPTS.includes(e.department)) return 'Département invalide';
+  if (e.contractType && !VALID_CONTRACTS.includes(e.contractType)) return 'Type de contrat invalide';
+  if (e.status     && !VALID_STATUSES.includes(e.status))  return 'Statut invalide';
+  if (e.salary !== undefined && e.salary !== null && (isNaN(parseFloat(e.salary)) || parseFloat(e.salary) < 0)) return 'Salaire invalide';
+  if (e.pin        && (!/^\d{4,8}$/.test(String(e.pin))))  return 'PIN invalide (4 à 8 chiffres)';
+  if (e.password   && (typeof e.password !== 'string' || e.password.length < 6))   return 'Mot de passe trop court (6 caractères min)';
+  return null;
 }
 
 router.get('/', async (req, res) => {
@@ -38,12 +59,12 @@ router.get('/', async (req, res) => {
     const conditions = [];
     const params = [];
     if (companyId) { conditions.push('company_id = ?'); params.push(companyId); }
-    if (role) { conditions.push('role = ?'); params.push(role); }
+    if (role && VALID_ROLES.includes(role)) { conditions.push('role = ?'); params.push(role); }
     const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
     const [rows] = await db.query(`SELECT * FROM employees${where} ORDER BY id`, params);
     res.json(rows.map(mapEmployee));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -52,15 +73,21 @@ router.get('/:id', async (req, res) => {
     const [rows] = await db.query('SELECT * FROM employees WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Employé non trouvé' });
     res.json(mapEmployee(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
 router.post('/', async (req, res) => {
   try {
     const e = req.body;
+    const err = validateEmployee(e);
+    if (err) return res.status(400).json({ error: err });
+
     const passwordHash = e.password ? sha256(e.password) : null;
+    // PIN requis pour le kiosque — pas de valeur par défaut
+    const pin = e.pin ? String(e.pin) : null;
+
     await db.query(
       `INSERT INTO employees
         (id, company_id, first_name, last_name, email, phone, avatar, role, department, position,
@@ -69,32 +96,26 @@ router.post('/', async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         e.id, e.companyId || 'COMP001',
-        e.firstName, e.lastName, e.email, e.phone, e.avatar || '',
+        e.firstName, e.lastName, e.email, e.phone || '', e.avatar || '',
         e.role, e.department, e.position, e.contractType,
         e.startDate || null, e.salary || null, e.status, e.manager || null,
         e.address || '', e.birthDate || null, e.leaveBalance ?? 25, e.leaveUsed ?? 0,
-        passwordHash, e.pin || '1234',
+        passwordHash, pin,
       ]
     );
     const [rows] = await db.query('SELECT * FROM employees WHERE id = ?', [e.id]);
     res.status(201).json(mapEmployee(rows[0]));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Email ou ID déjà utilisé' });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
 router.put('/:id', async (req, res) => {
   try {
     const e = req.body;
-    // Build update parts conditionally (don't overwrite password unless explicitly provided)
-    const params = [
-      e.firstName, e.lastName, e.email, e.phone, e.avatar || '',
-      e.role, e.department, e.position, e.contractType,
-      e.startDate || null, e.salary || null, e.status, e.manager || null,
-      e.address || '', e.birthDate || null, e.leaveBalance ?? 25, e.leaveUsed ?? 0,
-      e.pin || null,
-      req.params.id,
-    ];
+    const valErr = validateEmployee(e);
+    if (valErr) return res.status(400).json({ error: valErr });
 
     await db.query(
       `UPDATE employees SET
@@ -102,10 +123,16 @@ router.put('/:id', async (req, res) => {
         position=?, contract_type=?, start_date=?, salary=?, status=?, manager_id=?,
         address=?, birth_date=?, leave_balance=?, leave_used=?, pin=?
        WHERE id=?`,
-      params
+      [
+        e.firstName, e.lastName, e.email, e.phone || '', e.avatar || '',
+        e.role, e.department, e.position, e.contractType,
+        e.startDate || null, e.salary || null, e.status, e.manager || null,
+        e.address || '', e.birthDate || null, e.leaveBalance ?? 25, e.leaveUsed ?? 0,
+        e.pin ? String(e.pin) : null,
+        req.params.id,
+      ]
     );
 
-    // Update password separately if provided
     if (e.password) {
       await db.query('UPDATE employees SET password_hash = ? WHERE id = ?', [sha256(e.password), req.params.id]);
     }
@@ -114,7 +141,8 @@ router.put('/:id', async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ error: 'Employé non trouvé' });
     res.json(mapEmployee(rows[0]));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Email déjà utilisé' });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -122,8 +150,8 @@ router.delete('/:id', async (req, res) => {
   try {
     await db.query('DELETE FROM employees WHERE id = ?', [req.params.id]);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

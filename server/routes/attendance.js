@@ -27,8 +27,8 @@ router.get('/', async (req, res) => {
     query += ' ORDER BY date DESC, id';
     const [rows] = await db.query(query, params);
     res.json(rows.map(mapRecord));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -48,8 +48,8 @@ router.post('/', async (req, res) => {
     );
     const [rows] = await db.query('SELECT * FROM attendance_records WHERE id = ?', [id]);
     res.status(201).json(mapRecord(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -66,8 +66,8 @@ router.put('/:id', async (req, res) => {
     const [rows] = await db.query('SELECT * FROM attendance_records WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Enregistrement non trouvé' });
     res.json(mapRecord(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

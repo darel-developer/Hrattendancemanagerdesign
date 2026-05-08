@@ -85,12 +85,14 @@ export const notificationsApi = {
     request<Notification>("/notifications", { method: "POST", body: JSON.stringify(notif) }),
   markRead: (id: string) =>
     request<{ success: boolean }>(`/notifications/${id}/read`, { method: "PUT" }),
-  markAllRead: () =>
-    request<{ success: boolean }>("/notifications/read-all", { method: "PUT" }),
+  markAllRead: (companyId?: string) => {
+    const qs = companyId ? `?companyId=${companyId}` : "";
+    return request<{ success: boolean }>(`/notifications/read-all${qs}`, { method: "PUT" });
+  },
   deleteOne: (id: string) =>
     request<{ success: boolean }>(`/notifications/${id}`, { method: "DELETE" }),
-  deleteAll: () =>
-    request<{ success: boolean }>("/notifications", { method: "DELETE" }),
+  deleteAll: (companyId: string) =>
+    request<{ success: boolean }>(`/notifications?companyId=${companyId}`, { method: "DELETE" }),
 };
 
 // ─── Reports ──────────────────────────────────────────────────

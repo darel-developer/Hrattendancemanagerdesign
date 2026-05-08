@@ -59,7 +59,7 @@ export function NotificationsPage() {
   const unreadCount = notifs.filter((n) => !n.read).length;
 
   const markAllRead = async () => {
-    await notificationsApi.markAllRead().catch(console.error);
+    await notificationsApi.markAllRead(currentUser?.companyId ?? undefined).catch(console.error);
     setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
   };
   const markRead = async (id: string) => {
@@ -71,7 +71,8 @@ export function NotificationsPage() {
     setNotifs((prev) => prev.filter((n) => n.id !== id));
   };
   const clearAll = async () => {
-    await notificationsApi.deleteAll().catch(console.error);
+    if (!currentUser?.companyId) return;
+    await notificationsApi.deleteAll(currentUser.companyId).catch(console.error);
     setNotifs([]);
   };
 

@@ -37,8 +37,8 @@ router.get('/', async (req, res) => {
     query += companyId ? ' ORDER BY ts.date ASC, ts.start_time ASC' : ' ORDER BY date ASC, start_time ASC';
     const [rows] = await db.query(query, params);
     res.json(rows.map(mapShift));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -60,8 +60,8 @@ router.post('/', async (req, res) => {
     );
     const [rows] = await db.query('SELECT * FROM team_shifts WHERE id = ?', [id]);
     res.status(201).json(mapShift(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -81,8 +81,8 @@ router.put('/:id', async (req, res) => {
     const [rows] = await db.query('SELECT * FROM team_shifts WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Planning non trouvé' });
     res.json(mapShift(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -90,8 +90,8 @@ router.delete('/:id', async (req, res) => {
   try {
     await db.query('DELETE FROM team_shifts WHERE id = ?', [req.params.id]);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

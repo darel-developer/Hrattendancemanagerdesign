@@ -42,8 +42,8 @@ router.get('/', async (req, res) => {
     query += ' ORDER BY created_at DESC';
     const [rows] = await db.query(query, params);
     res.json(rows.map(mapReport));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -58,8 +58,8 @@ router.post('/', async (req, res) => {
     );
     const [rows] = await db.query('SELECT * FROM reports WHERE id = ?', [id]);
     res.status(201).json(mapReport(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -67,8 +67,8 @@ router.put('/:id/read', async (req, res) => {
   try {
     await db.query('UPDATE reports SET is_read = TRUE WHERE id = ?', [req.params.id]);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

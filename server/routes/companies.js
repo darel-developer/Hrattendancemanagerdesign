@@ -28,8 +28,8 @@ router.get('/', async (_req, res) => {
       ORDER BY c.name
     `);
     res.json(rows.map(mapCompany));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -38,8 +38,8 @@ router.get('/:id', async (req, res) => {
     const [rows] = await db.query('SELECT * FROM companies WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Entreprise non trouvée' });
     res.json(mapCompany(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -54,8 +54,8 @@ router.post('/', async (req, res) => {
     );
     const [rows] = await db.query('SELECT * FROM companies WHERE id = ?', [c.id]);
     res.status(201).json(mapCompany(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -68,8 +68,8 @@ router.put('/:id', async (req, res) => {
     );
     const [rows] = await db.query('SELECT * FROM companies WHERE id = ?', [req.params.id]);
     res.json(mapCompany(rows[0]));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -77,8 +77,8 @@ router.delete('/:id', async (req, res) => {
   try {
     await db.query('DELETE FROM companies WHERE id = ?', [req.params.id]);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
