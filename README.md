@@ -88,6 +88,7 @@ npm run dev
 ---
 
 ## Comptes de démonstration
+npm audit
 
 Mot de passe universel : **`admin1234`**
 
