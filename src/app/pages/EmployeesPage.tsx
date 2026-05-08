@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useNavigate, Navigate } from "react-router";
 import {
   Search, Plus, Eye, Edit2, Trash2, Phone, Mail, X, Euro, Shield,
-  AlertCircle
+  AlertCircle, Download
 } from "lucide-react";
 import { Employee, departments } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
@@ -549,6 +549,25 @@ export function EmployeesPage() {
     return matchSearch && matchDept && matchStatus;
   });
 
+  const exportCSV = () => {
+    const rows = [
+      ["Prénom", "Nom", "Email", "Téléphone", "Rôle", "Département", "Poste", "Contrat", "Statut", "Date d'entrée", "Salaire (FCFA)", "Solde congés"],
+      ...filtered.map((e) => [
+        e.firstName, e.lastName, e.email, e.phone,
+        e.role, e.department, e.position, e.contractType,
+        e.status, e.startDate, String(e.salary), String(e.leaveBalance),
+      ]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `employes_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const depts = ["Tous", "Ingénierie", "RH", "Marketing", "Finance", "Direction", "Design"];
   const statuses = ["Tous", "Actif", "Inactif", "En congé"];
 
@@ -602,6 +621,14 @@ export function EmployeesPage() {
             </button>
           ))}
         </div>
+
+        <button onClick={exportCSV}
+          className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all"
+          style={{ background: "var(--hr-card)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600 }}
+        >
+          <Download size={15} />
+          CSV
+        </button>
 
         <button onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90"

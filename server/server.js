@@ -12,6 +12,9 @@ const companiesRouter = require('./routes/companies');
 const kioskRouter = require('./routes/kiosk');
 const superadminRouter = require('./routes/superadmin');
 const { router: reportsRouter, ensureTable: ensureReportsTable } = require('./routes/reports');
+const performanceRouter = require('./routes/performance');
+const documentsRouter = require('./routes/documents');
+const planningRouter = require('./routes/planning');
 const db = require('./db');
 
 const app = express();
@@ -29,6 +32,9 @@ app.use('/api/companies', companiesRouter);
 app.use('/api/kiosk', kioskRouter);
 app.use('/api/superadmin', superadminRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/performance', performanceRouter);
+app.use('/api/documents', documentsRouter);
+app.use('/api/planning', planningRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 

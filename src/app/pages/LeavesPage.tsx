@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Plus, CheckCircle2, XCircle, Clock, CalendarDays, X,
-  MessageSquare, User, TrendingDown
+  MessageSquare, User, TrendingDown, Download
 } from "lucide-react";
 import { LeaveRequest } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
@@ -333,6 +333,25 @@ export function LeavesPage() {
   const leaveBalance = (currentUser?.leaveBalance ?? 25) - (currentUser?.leaveUsed ?? 0);
   const canApprove = role === "Admin" || role === "Manager";
 
+  const exportCSV = () => {
+    const rows = [
+      ["Employé", "Type", "Date début", "Date fin", "Jours", "Statut", "Motif", "Date demande"],
+      ...filtered.map((l) => [
+        l.employee ? `${l.employee.firstName} ${l.employee.lastName}` : l.employeeId,
+        l.type, l.startDate, l.endDate, String(l.days),
+        l.status, l.reason, l.requestDate,
+      ]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `conges_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-5">
       {/* Summary cards */}
@@ -400,14 +419,24 @@ export function LeavesPage() {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => setShowNewModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90"
-          style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
-        >
-          <Plus size={15} />
-          Nouvelle demande
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCSV}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all"
+            style={{ background: "var(--hr-card)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600 }}
+          >
+            <Download size={15} />
+            CSV
+          </button>
+          <button
+            onClick={() => setShowNewModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
+          >
+            <Plus size={15} />
+            Nouvelle demande
+          </button>
+        </div>
       </div>
 
       {/* Leaves list */}

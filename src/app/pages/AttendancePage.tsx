@@ -433,6 +433,33 @@ export function AttendancePage() {
 
   const filtered = visibleRecords.filter((r) => filterStatus === "Tous" || r.status === filterStatus);
 
+  const exportCSV = () => {
+    const getEmpName = (id: string) => {
+      const e = employees.find((emp) => emp.id === id);
+      return e ? `${e.firstName} ${e.lastName}` : id;
+    };
+    const rows = [
+      ["Employé", "Date", "Entrée", "Sortie", "Statut", "Heures travaillées", "Note"],
+      ...filtered.map((r) => [
+        getEmpName(r.employeeId),
+        r.date,
+        r.checkIn ?? "",
+        r.checkOut ?? "",
+        r.status,
+        r.hoursWorked != null ? String(r.hoursWorked) : "",
+        r.note ?? "",
+      ]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `presences_${selectedDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const stats = {
     presents: visibleRecords.filter((r) => r.status === "Présent" || r.status === "Télétravail").length,
     absents: visibleRecords.filter((r) => r.status === "Absent").length,
@@ -552,11 +579,11 @@ export function AttendancePage() {
             </button>
           ))}
         </div>
-        <button className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all"
+        <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all"
           style={{ border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600, background: "var(--hr-card)" }}
         >
           <Download size={14} />
-          Exporter
+          Exporter CSV
         </button>
       </div>
 

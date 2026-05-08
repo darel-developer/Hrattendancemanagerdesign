@@ -5,6 +5,9 @@ import type {
   LeaveRequest,
   Notification,
   Report,
+  PerformanceReview,
+  EmployeeDocument,
+  TeamShift,
 } from "../data/mockData";
 
 const API_BASE = "/api";
@@ -100,6 +103,54 @@ export const reportsApi = {
     request<Report>("/reports", { method: "POST", body: JSON.stringify(report) }),
   markRead: (id: string) =>
     request<{ success: boolean }>(`/reports/${id}/read`, { method: "PUT" }),
+};
+
+// ─── Performance ──────────────────────────────────────────────
+export const performanceApi = {
+  getAll: (params?: { employeeId?: string; reviewerId?: string; companyId?: string }) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null)) as Record<string, string>
+    ).toString();
+    return request<PerformanceReview[]>(`/performance${qs ? "?" + qs : ""}`);
+  },
+  create: (review: Partial<PerformanceReview>) =>
+    request<PerformanceReview>("/performance", { method: "POST", body: JSON.stringify(review) }),
+  update: (id: string, updates: Partial<PerformanceReview>) =>
+    request<PerformanceReview>(`/performance/${id}`, { method: "PUT", body: JSON.stringify(updates) }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/performance/${id}`, { method: "DELETE" }),
+};
+
+// ─── Documents ────────────────────────────────────────────────
+export const documentsApi = {
+  getAll: (params?: { employeeId?: string; companyId?: string }) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null)) as Record<string, string>
+    ).toString();
+    return request<EmployeeDocument[]>(`/documents${qs ? "?" + qs : ""}`);
+  },
+  create: (doc: Partial<EmployeeDocument>) =>
+    request<EmployeeDocument>("/documents", { method: "POST", body: JSON.stringify(doc) }),
+  update: (id: string, updates: Partial<EmployeeDocument>) =>
+    request<EmployeeDocument>(`/documents/${id}`, { method: "PUT", body: JSON.stringify(updates) }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/documents/${id}`, { method: "DELETE" }),
+};
+
+// ─── Planning ─────────────────────────────────────────────────
+export const planningApi = {
+  getAll: (params?: { employeeId?: string; companyId?: string; startDate?: string; endDate?: string }) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null)) as Record<string, string>
+    ).toString();
+    return request<TeamShift[]>(`/planning${qs ? "?" + qs : ""}`);
+  },
+  create: (shift: Partial<TeamShift>) =>
+    request<TeamShift>("/planning", { method: "POST", body: JSON.stringify(shift) }),
+  update: (id: string, updates: Partial<TeamShift>) =>
+    request<TeamShift>(`/planning/${id}`, { method: "PUT", body: JSON.stringify(updates) }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/planning/${id}`, { method: "DELETE" }),
 };
 
 // ─── Auth ─────────────────────────────────────────────────────

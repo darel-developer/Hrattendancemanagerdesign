@@ -6,15 +6,17 @@ import {
   Users,
   Clock,
   CalendarDays,
+  CalendarCheck,
   BarChart3,
   Bell,
   Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Building2,
   Shield,
-  UserCircle,
+  Star,
+  FileText,
+  LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -30,12 +32,16 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "nav.dashboard", roles: ["Admin", "Manager", "Employee"] },
-  { to: "/employees", icon: Users, label: "nav.employees", roles: ["Admin"] },
-  { to: "/attendance", icon: Clock, label: "nav.attendance", roles: ["Admin", "Manager", "Employee"] },
-  { to: "/leaves", icon: CalendarDays, label: "nav.leaves", roles: ["Admin", "Manager", "Employee"] },
-  { to: "/reports", icon: BarChart3, label: "nav.reports", roles: ["Admin", "Manager", "Employee"] },
-  { to: "/notifications", icon: Bell, label: "nav.notifications", roles: ["Admin", "Manager", "Employee"] },
+  { to: "/dashboard",   icon: LayoutDashboard, label: "nav.dashboard",    roles: ["Admin", "Manager", "Employee"] },
+  { to: "/employees",   icon: Users,            label: "nav.employees",    roles: ["Admin"] },
+  { to: "/attendance",  icon: Clock,            label: "nav.attendance",   roles: ["Admin", "Manager", "Employee"] },
+  { to: "/calendar",    icon: CalendarDays,     label: "nav.calendar",     roles: ["Admin", "Manager", "Employee"] },
+  { to: "/leaves",      icon: CalendarCheck,    label: "nav.leaves",       roles: ["Admin", "Manager", "Employee"] },
+  { to: "/planning",    icon: LayoutGrid,       label: "nav.planning",     roles: ["Admin", "Manager"] },
+  { to: "/performance", icon: Star,             label: "nav.performance",  roles: ["Admin", "Manager", "Employee"] },
+  { to: "/documents",   icon: FileText,         label: "nav.documents",    roles: ["Admin", "Manager", "Employee"] },
+  { to: "/reports",     icon: BarChart3,        label: "nav.reports",      roles: ["Admin", "Manager", "Employee"] },
+  { to: "/notifications", icon: Bell,           label: "nav.notifications",roles: ["Admin", "Manager", "Employee"] },
 ];
 
 export function Sidebar() {

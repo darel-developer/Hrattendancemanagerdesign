@@ -95,6 +95,47 @@ export interface Report {
   isRead: boolean;
 }
 
+// ─── Performance Reviews ──────────────────────────────────────────────────────
+export type ReviewStatus = "Brouillon" | "Soumis" | "Acquitté";
+
+export interface PerformanceReview {
+  id: string;
+  employeeId: string;
+  reviewerId: string;
+  period: string;
+  rating: number | null;
+  strengths: string;
+  improvements: string;
+  goals: string;
+  status: ReviewStatus;
+  createdAt: string | null;
+}
+
+// ─── Employee Documents ───────────────────────────────────────────────────────
+export interface EmployeeDocument {
+  id: string;
+  employeeId: string;
+  title: string;
+  type: string;
+  fileUrl: string;
+  expiryDate: string | null;
+  createdAt: string | null;
+}
+
+// ─── Team Shifts ──────────────────────────────────────────────────────────────
+export type ShiftType = "Matin" | "Après-midi" | "Nuit" | "Repos";
+
+export interface TeamShift {
+  id: string;
+  employeeId: string;
+  date: string;
+  startTime: string | null;
+  endTime: string | null;
+  shiftType: ShiftType;
+  note: string;
+  createdAt: string | null;
+}
+
 // ─── Static chart data (utilisé pour les graphiques de démonstration) ─────────
 export const weeklyAttendanceData = [
   { day: "Lun", presents: 6, absents: 1, retards: 1 },
