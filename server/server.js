@@ -38,9 +38,9 @@ app.use(cors({
   credentials: true,
 }));
 
-// ─── Parsing JSON — taille limitée à 50kb ─────────────────────────────────────
-app.use(express.json({ limit: '50kb' }));
-app.use(express.urlencoded({ limit: '50kb', extended: false }));
+// ─── Parsing JSON — limite augmentée pour les avatars base64 ─────────────────
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: false }));
 
 // ─── Rate limiting global ─────────────────────────────────────────────────────
 app.use('/api', generalLimiter);

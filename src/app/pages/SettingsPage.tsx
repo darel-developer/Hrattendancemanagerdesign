@@ -498,49 +498,93 @@ export function SettingsPage() {
         {/* Company */}
         {activeSection === "company" && (
           <div className="rounded-2xl p-6" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
-            <h2 className="text-sm mb-5" style={{ fontWeight: 800, color: "var(--hr-text)" }}>Paramètres entreprise</h2>
-            <div className="space-y-4">
-              {[
-                { label: "Nom de l'entreprise", key: "name", placeholder: "Ex: TechCorp" },
-                { label: "Secteur d'activité", key: "sector", placeholder: "Ex: Technologie" },
-                { label: "Email RH", key: "hrEmail", placeholder: "rh@entreprise.com" },
-                { label: "Adresse du siège", key: "address", placeholder: "123 Rue principale, Ville" },
-              ].map((f) => (
-                <div key={f.key}>
-                  <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>{f.label}</label>
-                  <input
-                    value={(companyForm as any)[f.key] ?? ""}
-                    onChange={(e) => setCompanyForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                    placeholder={f.placeholder}
-                    className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                    style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
-                  />
-                </div>
-              ))}
-              <div>
-                <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Heure de début de journée</label>
-                <input type="time"
-                  value={companyForm.workStart ?? "09:00"}
-                  onChange={(e) => setCompanyForm((p) => ({ ...p, workStart: e.target.value }))}
-                  className="px-3 py-2.5 rounded-xl text-sm outline-none"
-                  style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }} />
-              </div>
-              <div>
-                <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Tolérance de retard (minutes)</label>
-                <input type="number"
-                  value={companyForm.lateTolerance ?? 5}
-                  onChange={(e) => setCompanyForm((p) => ({ ...p, lateTolerance: parseInt(e.target.value) || 0 }))}
-                  className="px-3 py-2.5 rounded-xl text-sm outline-none w-28"
-                  style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }} />
-                <p className="text-xs mt-1" style={{ color: "var(--hr-text-light)" }}>Délai avant qu'une arrivée soit considérée en retard</p>
-              </div>
-              <button onClick={handleCompanySave} disabled={companySaving}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm hover:opacity-90"
-                style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700, opacity: companySaving ? 0.7 : 1 }}>
-                <Save size={14} />
-                {companySaving ? "Enregistrement…" : saved ? "Enregistré !" : "Enregistrer"}
-              </button>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-sm" style={{ fontWeight: 800, color: "var(--hr-text)" }}>Paramètres entreprise</h2>
+              {currentUser?.role !== "Admin" && (
+                <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: "#FEF3C7", color: "#D97706", fontWeight: 700 }}>
+                  Lecture seule
+                </span>
+              )}
             </div>
+            {currentUser?.role === "Admin" ? (
+              <div className="space-y-4">
+                {[
+                  { label: "Nom de l'entreprise", key: "name", placeholder: "Ex: TechCorp" },
+                  { label: "Secteur d'activité", key: "sector", placeholder: "Ex: Technologie" },
+                  { label: "Email RH", key: "hrEmail", placeholder: "rh@entreprise.com" },
+                  { label: "Adresse du siège", key: "address", placeholder: "123 Rue principale, Ville" },
+                ].map((f) => (
+                  <div key={f.key}>
+                    <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>{f.label}</label>
+                    <input
+                      value={(companyForm as any)[f.key] ?? ""}
+                      onChange={(e) => setCompanyForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                      style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Heure de début de journée</label>
+                  <input type="time"
+                    value={companyForm.workStart ?? "09:00"}
+                    onChange={(e) => setCompanyForm((p) => ({ ...p, workStart: e.target.value }))}
+                    className="px-3 py-2.5 rounded-xl text-sm outline-none"
+                    style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }} />
+                </div>
+                <div>
+                  <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Tolérance de retard (minutes)</label>
+                  <input type="number"
+                    value={companyForm.lateTolerance ?? 5}
+                    onChange={(e) => setCompanyForm((p) => ({ ...p, lateTolerance: parseInt(e.target.value) || 0 }))}
+                    className="px-3 py-2.5 rounded-xl text-sm outline-none w-28"
+                    style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }} />
+                  <p className="text-xs mt-1" style={{ color: "var(--hr-text-light)" }}>Délai avant qu'une arrivée soit considérée en retard</p>
+                </div>
+                <button onClick={handleCompanySave} disabled={companySaving}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm hover:opacity-90"
+                  style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700, opacity: companySaving ? 0.7 : 1 }}>
+                  <Save size={14} />
+                  {companySaving ? "Enregistrement…" : saved ? "Enregistré !" : "Enregistrer"}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {[
+                  { label: "Nom de l'entreprise", value: currentCompany?.name },
+                  { label: "Secteur d'activité", value: currentCompany?.sector },
+                  { label: "Email RH", value: currentCompany?.hrEmail },
+                  { label: "Adresse du siège", value: currentCompany?.address },
+                ].map((f) => (
+                  <div key={f.label}>
+                    <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>{f.label}</label>
+                    <div className="w-full px-3 py-2.5 rounded-xl text-sm"
+                      style={{ background: "var(--hr-hover)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-muted)" }}>
+                      {f.value || "—"}
+                    </div>
+                  </div>
+                ))}
+                <div>
+                  <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Heure de début de journée</label>
+                  <div className="px-3 py-2.5 rounded-xl text-sm inline-block"
+                    style={{ background: "var(--hr-hover)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-muted)" }}>
+                    {currentCompany?.workStart ?? "09:00"}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Tolérance de retard (minutes)</label>
+                  <div className="px-3 py-2.5 rounded-xl text-sm inline-block"
+                    style={{ background: "var(--hr-hover)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-muted)" }}>
+                    {currentCompany?.lateTolerance ?? 5} min
+                  </div>
+                  <p className="text-xs mt-1" style={{ color: "var(--hr-text-light)" }}>Délai avant qu'une arrivée soit considérée en retard</p>
+                </div>
+                <p className="text-xs pt-1" style={{ color: "var(--hr-text-light)" }}>
+                  Seul l'administrateur peut modifier ces paramètres.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </motion.div>

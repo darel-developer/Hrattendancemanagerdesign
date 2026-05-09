@@ -72,4 +72,13 @@ router.put('/:id/read', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM reports WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 module.exports = { router, ensureTable };

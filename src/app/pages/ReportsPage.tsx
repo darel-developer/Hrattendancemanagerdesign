@@ -107,6 +107,19 @@ function computePeriodCharts(
   return { points, leaveTypeData };
 }
 
+// ─── Download report as .txt ────────────────────────────────────────────────
+function downloadReportTxt(r: Report, senderName: string) {
+  const date = new Date(r.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const text = `RAPPORT : ${r.title}\nType : ${r.type}\nDe : ${senderName}\nDate : ${date}\n\n${"─".repeat(50)}\n\n${r.content}`;
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `rapport_${r.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── PDF Generator ─────────────────────────────────────────────────────────
 async function generatePDF(reportType: string, empList: Employee[], leaveList: LeaveRequest[]) {
   const today = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
@@ -606,7 +619,14 @@ export function ReportsPage() {
     leavesApi.getAll().then(setAllLeaves).catch(console.error);
     attendanceApi.getAll().then(setAttendanceRecords).catch(console.error);
     if (currentUser?.id) {
-      reportsApi.getReceived(currentUser.id).then(setReceivedReports).catch(console.error);
+      reportsApi.getReceived(currentUser.id).then(async (reports) => {
+        const fiveDaysAgo = Date.now() - 5 * 24 * 60 * 60 * 1000;
+        const toDelete = reports.filter(
+          (r) => r.isRead && new Date(r.createdAt).getTime() < fiveDaysAgo
+        );
+        await Promise.all(toDelete.map((r) => reportsApi.delete(r.id).catch(console.error)));
+        setReceivedReports(reports.filter((r) => !toDelete.some((d) => d.id === r.id)));
+      }).catch(console.error);
       reportsApi.getSent(currentUser.id).then(setSentReports).catch(console.error);
     }
   }, [currentUser?.id]);
@@ -735,11 +755,21 @@ export function ReportsPage() {
                         {r.dir === "sent" ? "Envoyé" : "Reçu"}
                       </span>
                       {r.dir === "received" && (
-                        <button onClick={() => setSelectedReport(r)}
-                          className="text-xs px-3 py-1.5 rounded-lg hover:opacity-80"
-                          style={{ background: "#6366F1", color: "white", fontWeight: 700 }}>
-                          Lire
-                        </button>
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); downloadReportTxt(r, other ? `${other.firstName} ${other.lastName}` : r.senderId); }}
+                            className="text-xs px-2 py-1.5 rounded-lg hover:opacity-80 flex items-center"
+                            style={{ background: "var(--hr-hover)", color: "var(--hr-text-sec)", fontWeight: 700, border: "1px solid var(--hr-card-border-hard)" }}
+                            title="Télécharger"
+                          >
+                            <Download size={11} />
+                          </button>
+                          <button onClick={() => setSelectedReport(r)}
+                            className="text-xs px-3 py-1.5 rounded-lg hover:opacity-80"
+                            style={{ background: "#6366F1", color: "white", fontWeight: 700 }}>
+                            Lire
+                          </button>
+                        </>
                       )}
                     </div>
                   </motion.div>
@@ -866,6 +896,14 @@ export function ReportsPage() {
                     <span className="text-xs px-2 py-0.5 rounded-full hidden sm:block" style={{ background: "var(--hr-badge-bg)", color: "var(--hr-badge-text)" }}>
                       {r.type}
                     </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); downloadReportTxt(r, sender ? `${sender.firstName} ${sender.lastName}` : r.senderId); }}
+                      className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1"
+                      style={{ background: "var(--hr-hover)", color: "var(--hr-text-sec)", fontWeight: 700, border: "1px solid var(--hr-card-border-hard)" }}
+                      title="Télécharger"
+                    >
+                      <Download size={11} />
+                    </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setSelectedReport(r); }}
                       className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-80"

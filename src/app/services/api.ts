@@ -105,6 +105,8 @@ export const reportsApi = {
     request<Report>("/reports", { method: "POST", body: JSON.stringify(report) }),
   markRead: (id: string) =>
     request<{ success: boolean }>(`/reports/${id}/read`, { method: "PUT" }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/reports/${id}`, { method: "DELETE" }),
 };
 
 // ─── Performance ──────────────────────────────────────────────
