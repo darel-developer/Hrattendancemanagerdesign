@@ -116,7 +116,10 @@ function downloadReportTxt(r: Report, senderName: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = `rapport_${r.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.txt`;
+  a.style.display = "none";
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
