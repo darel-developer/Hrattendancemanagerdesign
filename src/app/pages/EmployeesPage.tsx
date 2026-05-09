@@ -5,7 +5,7 @@ import {
   Search, Plus, Eye, Edit2, Trash2, Phone, Mail, X, Euro, Shield,
   AlertCircle, Download
 } from "lucide-react";
-import { Employee, departments } from "../data/mockData";
+import { Employee } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
 
 const statusColor: Record<string, { bg: string; text: string }> = {
@@ -27,13 +27,16 @@ const contractColor: Record<string, { bg: string; text: string }> = {
   "Freelance": { bg: "#FDE8FF", text: "#9333EA" },
 };
 
+const DEFAULT_DEPTS = ["Ingénierie", "RH", "Marketing", "Finance", "Direction", "Design"];
+
 interface AddEmployeeModalProps {
   onClose: () => void;
   onAdd: (emp: Employee & { password?: string; pin?: string }) => Promise<void>;
   allEmployees: Employee[];
+  companyDepts: string[];
 }
 
-function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProps) {
+function AddEmployeeModal({ onClose, onAdd, allEmployees, companyDepts }: AddEmployeeModalProps) {
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "",
     department: "Ingénierie" as any,
@@ -48,16 +51,24 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProp
     password: "",
     pin: "",
   });
+  const [customDept, setCustomDept] = useState("");
+  const [showCustomDept, setShowCustomDept] = useState(false);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const deptOptions = [...DEFAULT_DEPTS, ...companyDepts];
 
   const managers = allEmployees.filter((e) => e.role === "Manager" || e.role === "Admin");
 
   const handleSubmit = async () => {
     setError("");
+    const finalDept = showCustomDept ? customDept.trim() : form.department;
     if (!form.firstName || !form.lastName || !form.email || !form.salary) {
       setError("Veuillez remplir tous les champs obligatoires (prénom, nom, email, salaire).");
+      return;
+    }
+    if (showCustomDept && !finalDept) {
+      setError("Veuillez nommer le nouveau département.");
       return;
     }
     const salary = parseFloat(form.salary);
@@ -73,7 +84,7 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProp
       phone: form.phone,
       avatar: `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop`,
       role: form.role,
-      department: form.department,
+      department: finalDept,
       position: form.position,
       contractType: form.contractType,
       startDate: form.startDate || new Date().toISOString().split("T")[0],
@@ -169,8 +180,39 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees }: AddEmployeeModalProp
             </p>
           </div>
 
+          {/* Département */}
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Département</label>
+            <select
+              value={showCustomDept ? "__autre__" : form.department}
+              onChange={(e) => {
+                if (e.target.value === "__autre__") {
+                  setShowCustomDept(true);
+                  setCustomDept("");
+                } else {
+                  setShowCustomDept(false);
+                  set("department", e.target.value);
+                }
+              }}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+            >
+              {deptOptions.map((o) => <option key={o}>{o}</option>)}
+              <option value="__autre__">+ Créer un département…</option>
+            </select>
+            {showCustomDept && (
+              <input
+                autoFocus
+                placeholder="Nom du département (ex: Commercial)"
+                value={customDept}
+                onChange={(e) => setCustomDept(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none mt-2"
+                style={{ background: "var(--hr-input-bg)", border: "1.5px solid #6366F1", color: "var(--hr-text)" }}
+              />
+            )}
+          </div>
+
           {[
-            { label: "Département", key: "department", options: ["Ingénierie", "RH", "Marketing", "Finance", "Direction", "Design"] },
             { label: "Type de contrat", key: "contractType", options: ["CDI", "CDD", "Stage", "Freelance"] },
             { label: "Rôle", key: "role", options: ["Employee", "Manager", "Admin"] },
           ].map((f) => (
@@ -312,9 +354,11 @@ interface EditEmployeeModalProps {
   onClose: () => void;
   onSave: (id: string, updates: Partial<Employee> & { password?: string }) => Promise<void>;
   allEmployees: Employee[];
+  companyDepts: string[];
 }
 
-function EditEmployeeModal({ emp, onClose, onSave, allEmployees }: EditEmployeeModalProps) {
+function EditEmployeeModal({ emp, onClose, onSave, allEmployees, companyDepts }: EditEmployeeModalProps) {
+  const isCustom = !DEFAULT_DEPTS.includes(emp.department) && !companyDepts.includes(emp.department);
   const [form, setForm] = useState({
     firstName: emp.firstName,
     lastName: emp.lastName,
@@ -332,16 +376,24 @@ function EditEmployeeModal({ emp, onClose, onSave, allEmployees }: EditEmployeeM
     status: emp.status as any,
     password: "",
   });
+  const [customDept, setCustomDept] = useState(isCustom ? emp.department : "");
+  const [showCustomDept, setShowCustomDept] = useState(isCustom);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const deptOptions = [...DEFAULT_DEPTS, ...companyDepts];
 
   const managers = allEmployees.filter((e) => (e.role === "Manager" || e.role === "Admin") && e.id !== emp.id);
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   const handleSubmit = async () => {
     setError("");
+    const finalDept = showCustomDept ? customDept.trim() : form.department;
     if (!form.firstName || !form.lastName || !form.email) {
       setError("Prénom, nom et email sont obligatoires.");
+      return;
+    }
+    if (showCustomDept && !finalDept) {
+      setError("Veuillez nommer le nouveau département.");
       return;
     }
     const salary = form.salary ? parseFloat(form.salary) : null;
@@ -357,7 +409,7 @@ function EditEmployeeModal({ emp, onClose, onSave, allEmployees }: EditEmployeeM
         email: form.email,
         phone: form.phone,
         position: form.position,
-        department: form.department,
+        department: finalDept,
         contractType: form.contractType,
         role: form.role,
         startDate: form.startDate || null,
@@ -441,8 +493,39 @@ function EditEmployeeModal({ emp, onClose, onSave, allEmployees }: EditEmployeeM
             </div>
           </div>
 
+          {/* Département */}
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Département</label>
+            <select
+              value={showCustomDept ? "__autre__" : form.department}
+              onChange={(e) => {
+                if (e.target.value === "__autre__") {
+                  setShowCustomDept(true);
+                  setCustomDept("");
+                } else {
+                  setShowCustomDept(false);
+                  set("department", e.target.value);
+                }
+              }}
+              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+            >
+              {deptOptions.map((o) => <option key={o}>{o}</option>)}
+              <option value="__autre__">+ Créer un département…</option>
+            </select>
+            {showCustomDept && (
+              <input
+                autoFocus
+                placeholder="Nom du département (ex: Commercial)"
+                value={customDept}
+                onChange={(e) => setCustomDept(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none mt-2"
+                style={{ background: "var(--hr-input-bg)", border: "1.5px solid #6366F1", color: "var(--hr-text)" }}
+              />
+            )}
+          </div>
+
           {[
-            { label: "Département", key: "department", options: ["Ingénierie", "RH", "Marketing", "Finance", "Direction", "Design"] },
             { label: "Contrat", key: "contractType", options: ["CDI", "CDD", "Stage", "Freelance"] },
             { label: "Rôle", key: "role", options: ["Employee", "Manager", "Admin"] },
             { label: "Statut", key: "status", options: ["Actif", "Inactif", "En congé"] },
@@ -568,7 +651,8 @@ export function EmployeesPage() {
     URL.revokeObjectURL(url);
   };
 
-  const depts = ["Tous", "Ingénierie", "RH", "Marketing", "Finance", "Direction", "Design"];
+  const companyDepts = [...new Set(employees.map((e) => e.department).filter((d) => d && !DEFAULT_DEPTS.includes(d)))];
+  const depts = ["Tous", ...DEFAULT_DEPTS, ...companyDepts];
   const statuses = ["Tous", "Actif", "Inactif", "En congé"];
 
   return (
@@ -786,6 +870,7 @@ export function EmployeesPage() {
             onClose={() => setShowAddModal(false)}
             onAdd={addEmployee}
             allEmployees={employees}
+            companyDepts={companyDepts}
           />
         )}
         {selectedEmpToEdit && (
@@ -794,6 +879,7 @@ export function EmployeesPage() {
             onClose={() => setSelectedEmpToEdit(null)}
             onSave={updateEmployee}
             allEmployees={employees}
+            companyDepts={companyDepts}
           />
         )}
       </AnimatePresence>
