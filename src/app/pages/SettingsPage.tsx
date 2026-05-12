@@ -54,6 +54,8 @@ export function SettingsPage() {
   // Company form
   const [companyForm, setCompanyForm] = useState<Partial<Company>>({});
   const [companySaving, setCompanySaving] = useState(false);
+  const [geoDetecting, setGeoDetecting] = useState(false);
+  const [geoDetectError, setGeoDetectError] = useState("");
 
   useEffect(() => {
     if (currentCompany) {
@@ -117,6 +119,30 @@ export function SettingsPage() {
     } finally {
       setPwdSaving(false);
     }
+  };
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) {
+      setGeoDetectError("La géolocalisation n'est pas disponible sur ce navigateur.");
+      return;
+    }
+    setGeoDetecting(true);
+    setGeoDetectError("");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCompanyForm((p) => ({
+          ...p,
+          latitude: Math.round(pos.coords.latitude * 10000000) / 10000000,
+          longitude: Math.round(pos.coords.longitude * 10000000) / 10000000,
+        }));
+        setGeoDetecting(false);
+      },
+      () => {
+        setGeoDetectError("Impossible d'obtenir la position. Vérifiez les permissions du navigateur.");
+        setGeoDetecting(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const handleCompanySave = async () => {
@@ -556,14 +582,62 @@ export function SettingsPage() {
 
                 {/* Géolocalisation */}
                 <div className="pt-3 border-t" style={{ borderColor: "var(--hr-card-border-hard)" }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Navigation size={14} style={{ color: "#6366F1" }} />
-                    <p className="text-xs" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Géolocalisation du pointage</p>
+                  {/* En-tête avec statut actif/inactif */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Navigation size={14} style={{ color: "#6366F1" }} />
+                      <p className="text-xs" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Géolocalisation du pointage</p>
+                    </div>
+                    {companyForm.latitude != null && companyForm.longitude != null ? (
+                      <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
+                        style={{ background: "rgba(16,185,129,0.12)", color: "#10B981", fontWeight: 700 }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                        Pointage géolocalisé actif
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
+                        style={{ background: "rgba(156,163,175,0.15)", color: "var(--hr-text-light)", fontWeight: 600 }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
+                        Géolocalisation désactivée
+                      </span>
+                    )}
                   </div>
+
                   <p className="text-xs mb-3" style={{ color: "var(--hr-text-light)" }}>
-                    Définissez la position GPS de l'entreprise. Les employés devront se trouver dans le rayon autorisé pour pointer.
-                    Laissez vide pour désactiver la vérification géographique.
+                    Définissez la position GPS de l'entreprise. Les employés devront être dans le rayon pour pointer.
+                    Supprimez les coordonnées pour désactiver la vérification.
                   </p>
+
+                  {/* Bouton détecter ma position */}
+                  {canEdit && (
+                    <div className="mb-3">
+                      <button
+                        type="button"
+                        onClick={detectLocation}
+                        disabled={geoDetecting}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all hover:opacity-90 w-full justify-center"
+                        style={{
+                          background: "linear-gradient(135deg, #6366F1, #8B5CF6)",
+                          color: "white",
+                          fontWeight: 700,
+                          opacity: geoDetecting ? 0.7 : 1,
+                        }}>
+                        {geoDetecting ? (
+                          <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Détection en cours…</>
+                        ) : (
+                          <><MapPin size={14} /> Utiliser ma position actuelle</>
+                        )}
+                      </button>
+                      {geoDetectError && (
+                        <p className="text-xs mt-2 px-3 py-2 rounded-xl"
+                          style={{ background: "#FEE2E2", color: "#DC2626", fontWeight: 600 }}>
+                          {geoDetectError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Champs manuels */}
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                       <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Latitude</label>
@@ -571,7 +645,7 @@ export function SettingsPage() {
                         value={companyForm.latitude ?? ""}
                         onChange={(e) => canEdit && setCompanyForm((p) => ({ ...p, latitude: e.target.value ? parseFloat(e.target.value) : null }))}
                         readOnly={!canEdit}
-                        placeholder="Ex : 3.848"
+                        placeholder="Ex : 3.8480000"
                         className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
                         style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)", ...ro }} />
                     </div>
@@ -581,20 +655,32 @@ export function SettingsPage() {
                         value={companyForm.longitude ?? ""}
                         onChange={(e) => canEdit && setCompanyForm((p) => ({ ...p, longitude: e.target.value ? parseFloat(e.target.value) : null }))}
                         readOnly={!canEdit}
-                        placeholder="Ex : 11.502"
+                        placeholder="Ex : 11.5020000"
                         className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
                         style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)", ...ro }} />
                     </div>
                   </div>
-                  <div>
-                    <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Rayon autorisé (mètres)</label>
-                    <input type="number" min={10} max={5000}
-                      value={companyForm.geoRadius ?? 100}
-                      onChange={(e) => canEdit && setCompanyForm((p) => ({ ...p, geoRadius: parseInt(e.target.value) || 100 }))}
-                      readOnly={!canEdit}
-                      className="px-3 py-2.5 rounded-xl text-sm outline-none w-28"
-                      style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)", ...ro }} />
-                    <p className="text-xs mt-1" style={{ color: "var(--hr-text-light)" }}>Distance maximale depuis l'entreprise (par défaut 100 m)</p>
+
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Rayon autorisé (mètres)</label>
+                      <input type="number" min={10} max={5000}
+                        value={companyForm.geoRadius ?? 100}
+                        onChange={(e) => canEdit && setCompanyForm((p) => ({ ...p, geoRadius: parseInt(e.target.value) || 100 }))}
+                        readOnly={!canEdit}
+                        className="px-3 py-2.5 rounded-xl text-sm outline-none w-28"
+                        style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)", ...ro }} />
+                      <p className="text-xs mt-1" style={{ color: "var(--hr-text-light)" }}>Distance maximale autorisée (défaut : 100 m)</p>
+                    </div>
+                    {canEdit && (companyForm.latitude != null || companyForm.longitude != null) && (
+                      <button
+                        type="button"
+                        onClick={() => setCompanyForm((p) => ({ ...p, latitude: null, longitude: null }))}
+                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm transition-all hover:opacity-80 mb-5"
+                        style={{ background: "rgba(239,68,68,0.1)", color: "#EF4444", fontWeight: 600, border: "1px solid rgba(239,68,68,0.2)" }}>
+                        <X size={13} /> Désactiver
+                      </button>
+                    )}
                   </div>
                 </div>
 

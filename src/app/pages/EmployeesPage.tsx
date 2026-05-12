@@ -555,9 +555,10 @@ interface AddEmployeeModalProps {
   allEmployees: Employee[];
   departments: string[];
   onCreateDept: (name: string) => Promise<void>;
+  onSwitchToImport: () => void;
 }
 
-function AddEmployeeModal({ onClose, onAdd, allEmployees, departments, onCreateDept }: AddEmployeeModalProps) {
+function AddEmployeeModal({ onClose, onAdd, allEmployees, departments, onCreateDept, onSwitchToImport }: AddEmployeeModalProps) {
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "",
     department: "" as string,
@@ -613,13 +614,26 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees, departments, onCreateD
         className="w-full max-w-lg rounded-2xl p-6"
         style={{ background: "var(--hr-card)", maxHeight: "90vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--hr-text)" }}>Nouvel employé</h2>
-            <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>Remplissez les informations du collaborateur</p>
-          </div>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 style={{ fontWeight: 800, fontSize: "1.1rem", color: "var(--hr-text)" }}>Nouvel employé</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "var(--hr-hover)" }}>
             <X size={16} style={{ color: "var(--hr-text-muted)" }} />
+          </button>
+        </div>
+
+        {/* Tabs : créer manuellement | importer */}
+        <div className="flex gap-2 mb-5 p-1 rounded-xl" style={{ background: "var(--hr-hover)" }}>
+          <div className="flex-1 py-2 rounded-lg text-xs text-center"
+            style={{ background: "var(--hr-card)", fontWeight: 700, color: "var(--hr-text)", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
+            <Plus size={12} className="inline mr-1.5 -mt-0.5" />
+            Créer manuellement
+          </div>
+          <button onClick={onSwitchToImport}
+            className="flex-1 py-2 rounded-lg text-xs text-center transition-all hover:opacity-80 flex items-center justify-center gap-1.5"
+            style={{ color: "#6366F1", fontWeight: 600 }}>
+            <Upload size={12} />
+            Importer un fichier
           </button>
         </div>
         {error && (
@@ -1134,6 +1148,7 @@ export function EmployeesPage() {
             onClose={() => setShowAddModal(false)}
             onAdd={async (emp) => { await addEmployee(emp); setFilterDept("Tous"); }}
             allEmployees={employees} departments={departments} onCreateDept={createDept}
+            onSwitchToImport={() => { setShowAddModal(false); setShowImportModal(true); }}
           />
         )}
         {selectedEmpToEdit && (

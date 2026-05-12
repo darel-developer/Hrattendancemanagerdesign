@@ -217,6 +217,16 @@ app.listen(PORT, async () => {
   } catch (err) {
     console.error('[DB] Erreur colonnes géo :', err.message);
   }
+  // Convertir department de ENUM → VARCHAR pour accepter les départements personnalisés
+  try {
+    const [cols] = await db.query("SHOW COLUMNS FROM employees LIKE 'department'");
+    if (cols.length > 0 && cols[0].Type.startsWith('enum')) {
+      await db.query("ALTER TABLE employees MODIFY COLUMN department VARCHAR(100) NOT NULL DEFAULT ''");
+      console.log('[DB] Colonne department convertie ENUM → VARCHAR');
+    }
+  } catch (err) {
+    console.error('[DB] Erreur migration department :', err.message);
+  }
   scheduleAutoNotifications();
 
   // ─── Backup automatique ──────────────────────────────────────────────────
