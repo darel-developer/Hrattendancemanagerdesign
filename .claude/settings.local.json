@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"e:\\\\Travail\\\\Hrattendancemanagerdesign\" -Recurse -Force)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(head -50)",
+      "Bash(find e:\\\\\\\\Travail\\\\\\\\Hrattendancemanagerdesign -maxdepth 2 -type f \\\\\\( -name \"*.json\" -o -name \"*.config.*\" -o -name \"*.env*\" \\\\\\))",
+      "PowerShell(Get-ChildItem -Path \"e:\\\\Travail\\\\Hrattendancemanagerdesign\" -Depth 1 | Where-Object { $_.PSIsContainer -eq $false } | Select-Object Name)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/vite build *)",
+      "Bash(npx vite *)",
+      "Bash(git add *)"
+    ]
+  }
+}

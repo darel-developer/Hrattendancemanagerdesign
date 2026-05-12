@@ -11,10 +11,12 @@ const attendanceRouter = require('./routes/attendance');
 const leavesRouter = require('./routes/leaves');
 const notificationsRouter = require('./routes/notifications');
 const authRouter = require('./routes/auth');
+const { ensureGeoColumns } = require('./routes/companies');
 const companiesRouter = require('./routes/companies');
 const kioskRouter = require('./routes/kiosk');
 const superadminRouter = require('./routes/superadmin');
 const { router: reportsRouter, ensureTable: ensureReportsTable } = require('./routes/reports');
+const { router: departmentsRouter, ensureTable: ensureDepartmentsTable } = require('./routes/departments');
 const performanceRouter = require('./routes/performance');
 const documentsRouter = require('./routes/documents');
 const planningRouter = require('./routes/planning');
@@ -57,6 +59,7 @@ app.use('/api/leaves', leavesRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/companies', companiesRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/departments', departmentsRouter);
 app.use('/api/performance', performanceRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/planning', planningRouter);
@@ -201,6 +204,18 @@ app.listen(PORT, async () => {
     console.log('[DB] Table reports prête');
   } catch (err) {
     console.error('[DB] Erreur création table reports :', err.message);
+  }
+  try {
+    await ensureDepartmentsTable();
+    console.log('[DB] Table departments prête');
+  } catch (err) {
+    console.error('[DB] Erreur création table departments :', err.message);
+  }
+  try {
+    await ensureGeoColumns();
+    console.log('[DB] Colonnes géolocalisation prêtes');
+  } catch (err) {
+    console.error('[DB] Erreur colonnes géo :', err.message);
   }
   scheduleAutoNotifications();
 

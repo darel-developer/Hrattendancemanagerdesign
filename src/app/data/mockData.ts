@@ -35,6 +35,9 @@ export interface Company {
   hrEmail: string;
   workStart: string;
   lateTolerance: number;
+  latitude?: number | null;
+  longitude?: number | null;
+  geoRadius?: number;
 }
 
 // ─── Attendance ───────────────────────────────────────────────────────────────
@@ -136,45 +139,3 @@ export interface TeamShift {
   createdAt: string | null;
 }
 
-// ─── Static chart data (utilisé pour les graphiques de démonstration) ─────────
-export const weeklyAttendanceData = [
-  { day: "Lun", presents: 6, absents: 1, retards: 1 },
-  { day: "Mar", presents: 7, absents: 0, retards: 1 },
-  { day: "Mer", presents: 5, absents: 2, retards: 1 },
-  { day: "Jeu", presents: 6, absents: 1, retards: 0 },
-  { day: "Ven", presents: 7, absents: 1, retards: 0 },
-];
-
-export const monthlyAttendanceData = [
-  { month: "Oct", taux: 92 },
-  { month: "Nov", taux: 88 },
-  { month: "Dec", taux: 85 },
-  { month: "Jan", taux: 90 },
-  { month: "Fév", taux: 93 },
-  { month: "Mar", taux: 91 },
-  { month: "Avr", taux: 87 },
-];
-
-export const departmentData = [
-  { name: "Ingénierie", value: 3, color: "#6366F1" },
-  { name: "RH", value: 1, color: "#8B5CF6" },
-  { name: "Marketing", value: 1, color: "#EC4899" },
-  { name: "Finance", value: 1, color: "#14B8A6" },
-  { name: "Direction", value: 1, color: "#F59E0B" },
-  { name: "Design", value: 1, color: "#10B981" },
-];
-
-export const hoursWorkedData = [
-  { week: "S1", heures: 42 },
-  { week: "S2", heures: 38 },
-  { week: "S3", heures: 45 },
-  { week: "S4", heures: 40 },
-  { week: "S5", heures: 43 },
-  { week: "S6", heures: 39 },
-  { week: "S7", heures: 44 },
-  { week: "S8", heures: 41 },
-];
-
-export const departments: Department[] = [
-  "Ingénierie", "RH", "Marketing", "Finance", "Direction", "Design"
-];

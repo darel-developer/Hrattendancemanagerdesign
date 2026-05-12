@@ -10,15 +10,9 @@ const features = [
   { icon: BarChart3, text: "Rapports et statistiques avancés" },
 ];
 
-const demoAccounts = [
-  { role: "Admin", email: "sophie.moreau@company.com", color: "#6366F1" },
-  { role: "Manager", email: "thomas.dubois@company.com", color: "#8B5CF6" },
-  { role: "Employé", email: "lucas.bernard@company.com", color: "#14B8A6" },
-];
-
 export function LoginPage() {
-  const [email, setEmail] = useState("sophie.moreau@company.com");
-  const [password, setPassword] = useState("admin1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -87,20 +81,6 @@ export function LoginPage() {
             </motion.div>
           </div>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
-            className="grid grid-cols-3 gap-4">
-            {[
-              { val: "94%", label: "Taux présence" },
-              { val: "2", label: "Congés en attente" },
-              { val: "100%", label: "Données réelles" },
-            ].map((s, i) => (
-              <div key={i} className="rounded-2xl p-4 text-center"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <p className="text-white text-xl" style={{ fontWeight: 800 }}>{s.val}</p>
-                <p className="text-xs mt-1" style={{ color: "#64748B" }}>{s.label}</p>
-              </div>
-            ))}
-          </motion.div>
         </div>
       </motion.div>
 
@@ -118,31 +98,6 @@ export function LoginPage() {
 
           <h1 className="text-slate-800 mb-2" style={{ fontWeight: 800, fontSize: "1.75rem" }}>Bienvenue 👋</h1>
           <p className="mb-8 text-sm" style={{ color: "#6B7280" }}>Connectez-vous à votre espace RH</p>
-
-          {/* Demo selector */}
-          <div className="mb-6">
-            <p className="text-xs mb-2" style={{ color: "#6B7280", fontWeight: 600 }}>
-              ACCÈS DÉMO — Cliquez pour sélectionner un rôle
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {demoAccounts.map((acc) => (
-                <button key={acc.role}
-                  onClick={() => { setEmail(acc.email); setError(""); }}
-                  className="py-2 px-3 rounded-xl text-xs text-center transition-all border"
-                  style={{
-                    borderColor: email === acc.email ? acc.color : "#E5E7EB",
-                    background: email === acc.email ? `${acc.color}15` : "white",
-                    color: email === acc.email ? acc.color : "#6B7280",
-                    fontWeight: email === acc.email ? 700 : 400,
-                  }}>
-                  <div>{acc.role}</div>
-                  <div style={{ fontSize: "9px", opacity: 0.7, marginTop: "2px" }}>
-                    {acc.role === "Admin" ? "Accès total" : acc.role === "Manager" ? "Gère son équipe" : "Vue personnelle"}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
@@ -193,11 +148,6 @@ export function LoginPage() {
                 : <> Se connecter <ArrowRight size={16} /> </>}
             </motion.button>
           </form>
-
-          <p className="text-center mt-6 text-xs" style={{ color: "#9CA3AF" }}>
-            Mot de passe démo :{" "}
-            <span style={{ color: "#6366F1", fontWeight: 700 }}>admin1234</span>
-          </p>
 
           <div className="mt-4 text-center">
             <a href="/kiosk" className="text-xs hover:underline" style={{ color: "#6366F1" }}>

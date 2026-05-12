@@ -13,7 +13,16 @@ function mapCompany(row) {
     lateTolerance: row.late_tolerance,
     employeeCount: row.employee_count !== undefined ? parseInt(row.employee_count) : undefined,
     adminCount: row.admin_count !== undefined ? parseInt(row.admin_count) : undefined,
+    latitude: row.latitude !== null && row.latitude !== undefined ? parseFloat(row.latitude) : null,
+    longitude: row.longitude !== null && row.longitude !== undefined ? parseFloat(row.longitude) : null,
+    geoRadius: row.geo_radius !== null && row.geo_radius !== undefined ? parseInt(row.geo_radius) : 100,
   };
+}
+
+async function ensureGeoColumns() {
+  await db.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS latitude DECIMAL(10,7) NULL`);
+  await db.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS longitude DECIMAL(10,7) NULL`);
+  await db.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS geo_radius INT NOT NULL DEFAULT 100`);
 }
 
 router.get('/', async (_req, res) => {
@@ -48,9 +57,13 @@ router.post('/', async (req, res) => {
     const c = req.body;
     if (!c.id || !c.name) return res.status(400).json({ error: 'ID et nom requis' });
     await db.query(
-      `INSERT INTO companies (id, name, sector, address, hr_email, work_start, late_tolerance)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [c.id, c.name, c.sector || '', c.address || '', c.hrEmail || '', c.workStart || '09:00:00', c.lateTolerance ?? 5]
+      `INSERT INTO companies (id, name, sector, address, hr_email, work_start, late_tolerance, latitude, longitude, geo_radius)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        c.id, c.name, c.sector || '', c.address || '', c.hrEmail || '',
+        c.workStart || '09:00:00', c.lateTolerance ?? 5,
+        c.latitude ?? null, c.longitude ?? null, c.geoRadius ?? 100,
+      ]
     );
     const [rows] = await db.query('SELECT * FROM companies WHERE id = ?', [c.id]);
     res.status(201).json(mapCompany(rows[0]));
@@ -63,8 +76,14 @@ router.put('/:id', async (req, res) => {
   try {
     const c = req.body;
     await db.query(
-      `UPDATE companies SET name=?, sector=?, address=?, hr_email=?, work_start=?, late_tolerance=? WHERE id=?`,
-      [c.name, c.sector, c.address, c.hrEmail, c.workStart || '09:00:00', c.lateTolerance ?? 5, req.params.id]
+      `UPDATE companies SET name=?, sector=?, address=?, hr_email=?, work_start=?, late_tolerance=?,
+       latitude=?, longitude=?, geo_radius=? WHERE id=?`,
+      [
+        c.name, c.sector, c.address, c.hrEmail, c.workStart || '09:00:00',
+        c.lateTolerance ?? 5,
+        c.latitude ?? null, c.longitude ?? null, c.geoRadius ?? 100,
+        req.params.id,
+      ]
     );
     const [rows] = await db.query('SELECT * FROM companies WHERE id = ?', [req.params.id]);
     res.json(mapCompany(rows[0]));
@@ -84,3 +103,4 @@ router.delete('/:id', async (req, res) => {
 
 module.exports = router;
 module.exports.mapCompany = mapCompany;
+module.exports.ensureGeoColumns = ensureGeoColumns;

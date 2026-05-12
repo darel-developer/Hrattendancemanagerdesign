@@ -17,6 +17,7 @@ import {
   Star,
   FileText,
   LayoutGrid,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -33,7 +34,8 @@ interface NavItem {
 
 const allNavItems: NavItem[] = [
   { to: "/dashboard",   icon: LayoutDashboard, label: "nav.dashboard",    roles: ["Admin", "Manager", "Employee"] },
-  { to: "/employees",   icon: Users,            label: "nav.employees",    roles: ["Admin"] },
+  { to: "/employees",    icon: Users,            label: "nav.employees",    roles: ["Admin"] },
+  { to: "/departments",  icon: Building2,        label: "nav.departments",  roles: ["Admin"] },
   { to: "/attendance",  icon: Clock,            label: "nav.attendance",   roles: ["Admin", "Manager", "Employee"] },
   { to: "/calendar",    icon: CalendarDays,     label: "nav.calendar",     roles: ["Admin", "Manager", "Employee"] },
   { to: "/leaves",      icon: CalendarCheck,    label: "nav.leaves",       roles: ["Admin", "Manager", "Employee"] },

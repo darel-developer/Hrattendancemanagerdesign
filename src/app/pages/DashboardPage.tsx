@@ -68,7 +68,7 @@ function getWeekDates(): string[] {
 
 function AdminDashboard() {
   const navigate = useNavigate();
-  const { employees } = useAuth();
+  const { employees, currentUser } = useAuth();
   const [todayRecords, setTodayRecords] = useState<AttendanceRecord[]>([]);
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
   const [weekRecords, setWeekRecords] = useState<AttendanceRecord[]>([]);
@@ -76,14 +76,15 @@ function AdminDashboard() {
   const weekDates = getWeekDates();
 
   useEffect(() => {
+    const companyId = currentUser?.companyId;
     Promise.all([
       attendanceApi.getAll({ date: today }),
-      leavesApi.getAll(),
+      leavesApi.getAll(companyId ? { companyId } : {}),
       attendanceApi.getAll({ startDate: weekDates[0], endDate: weekDates[6] }),
     ])
       .then(([att, lvs, week]) => { setTodayRecords(att); setAllLeaves(lvs); setWeekRecords(week); })
       .catch(console.error);
-  }, [today]);
+  }, [today, currentUser?.companyId]);
 
   const weeklyChartData = weekDates.map((date) => {
     const day = weekRecords.filter((r) => r.date === date);
@@ -102,10 +103,10 @@ function AdminDashboard() {
   const pendingLeaves = allLeaves.filter((l) => l.status === "En attente").length;
   const activeEmployees = employees.filter((e) => e.status === "Actif").length;
 
-  const pendingLeavesList = allLeaves.filter((l) => l.status === "En attente").map((l) => ({
-    ...l,
-    employee: employees.find((e) => e.id === l.employeeId),
-  }));
+  const pendingLeavesList = allLeaves
+    .filter((l) => l.status === "En attente")
+    .map((l) => ({ ...l, employee: employees.find((e) => e.id === l.employeeId) }))
+    .filter((l) => l.employee != null);
 
   const deptColors: Record<string, string> = {
     "Ingénierie": "#6366F1", "RH": "#8B5CF6", "Marketing": "#EC4899",

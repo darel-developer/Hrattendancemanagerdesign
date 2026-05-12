@@ -15,6 +15,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { PerformancePage } from "./pages/PerformancePage";
 import { DocumentsPage } from "./pages/DocumentsPage";
 import { PlanningPage } from "./pages/PlanningPage";
+import { DepartmentsPage } from "./pages/DepartmentsPage";
 
 export const router = createBrowserRouter([
   {
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
       { path: "performance", Component: PerformancePage },
       { path: "documents", Component: DocumentsPage },
       { path: "planning", Component: PlanningPage },
+      { path: "departments", Component: DepartmentsPage },
     ],
   },
   {

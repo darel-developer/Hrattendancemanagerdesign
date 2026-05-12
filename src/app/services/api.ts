@@ -157,6 +157,20 @@ export const planningApi = {
     request<{ success: boolean }>(`/planning/${id}`, { method: "DELETE" }),
 };
 
+// ─── Departments ──────────────────────────────────────────────
+export type DepartmentItem = { id: string; companyId: string; name: string; employeeCount: number };
+
+export const departmentsApi = {
+  getAll: (companyId: string) =>
+    request<DepartmentItem[]>(`/departments?companyId=${encodeURIComponent(companyId)}`),
+  create: (data: { name: string; companyId: string }) =>
+    request<DepartmentItem>("/departments", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: { name: string; companyId: string }) =>
+    request<DepartmentItem>(`/departments/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: string, companyId: string) =>
+    request<{ success: boolean }>(`/departments/${id}?companyId=${encodeURIComponent(companyId)}`, { method: "DELETE" }),
+};
+
 // ─── Auth ─────────────────────────────────────────────────────
 export const authApi = {
   login: (email: string, password: string) =>
@@ -192,9 +206,9 @@ export const kioskApi = {
     request<Pick<Employee, "id" | "firstName" | "lastName" | "avatar" | "position" | "department">[]>(
       `/kiosk/employees/${companyId}`
     ),
-  checkin: (employeeId: string, pin: string, companyId: string) =>
+  checkin: (employeeId: string, pin: string, companyId: string, latitude?: number | null, longitude?: number | null) =>
     request<{ success: boolean; action: "check_in" | "check_out"; time: string; hoursWorked?: number; employee: string; status?: string }>(
       "/kiosk/checkin",
-      { method: "POST", body: JSON.stringify({ employeeId, pin, companyId }) }
+      { method: "POST", body: JSON.stringify({ employeeId, pin, companyId, latitude, longitude }) }
     ),
 };

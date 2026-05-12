@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   User, Building2, Bell, Shield, Palette, Globe, ChevronRight,
   Camera, Save, Lock, Mail, Phone, MapPin, Sun, Moon,
-  Check, X, Eye, EyeOff, AlertCircle, Upload
+  Check, X, Eye, EyeOff, AlertCircle, Upload, Navigation
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -64,6 +64,9 @@ export function SettingsPage() {
         hrEmail: currentCompany.hrEmail,
         workStart: currentCompany.workStart,
         lateTolerance: currentCompany.lateTolerance,
+        latitude: currentCompany.latitude ?? null,
+        longitude: currentCompany.longitude ?? null,
+        geoRadius: currentCompany.geoRadius ?? 100,
       });
     }
   }, [currentCompany]);
@@ -550,6 +553,51 @@ export function SettingsPage() {
                     style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)", ...ro }} />
                   <p className="text-xs mt-1" style={{ color: "var(--hr-text-light)" }}>Délai avant qu'une arrivée soit considérée en retard</p>
                 </div>
+
+                {/* Géolocalisation */}
+                <div className="pt-3 border-t" style={{ borderColor: "var(--hr-card-border-hard)" }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Navigation size={14} style={{ color: "#6366F1" }} />
+                    <p className="text-xs" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Géolocalisation du pointage</p>
+                  </div>
+                  <p className="text-xs mb-3" style={{ color: "var(--hr-text-light)" }}>
+                    Définissez la position GPS de l'entreprise. Les employés devront se trouver dans le rayon autorisé pour pointer.
+                    Laissez vide pour désactiver la vérification géographique.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Latitude</label>
+                      <input type="number" step="any"
+                        value={companyForm.latitude ?? ""}
+                        onChange={(e) => canEdit && setCompanyForm((p) => ({ ...p, latitude: e.target.value ? parseFloat(e.target.value) : null }))}
+                        readOnly={!canEdit}
+                        placeholder="Ex : 3.848"
+                        className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                        style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)", ...ro }} />
+                    </div>
+                    <div>
+                      <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Longitude</label>
+                      <input type="number" step="any"
+                        value={companyForm.longitude ?? ""}
+                        onChange={(e) => canEdit && setCompanyForm((p) => ({ ...p, longitude: e.target.value ? parseFloat(e.target.value) : null }))}
+                        readOnly={!canEdit}
+                        placeholder="Ex : 11.502"
+                        className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                        style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)", ...ro }} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Rayon autorisé (mètres)</label>
+                    <input type="number" min={10} max={5000}
+                      value={companyForm.geoRadius ?? 100}
+                      onChange={(e) => canEdit && setCompanyForm((p) => ({ ...p, geoRadius: parseInt(e.target.value) || 100 }))}
+                      readOnly={!canEdit}
+                      className="px-3 py-2.5 rounded-xl text-sm outline-none w-28"
+                      style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)", ...ro }} />
+                    <p className="text-xs mt-1" style={{ color: "var(--hr-text-light)" }}>Distance maximale depuis l'entreprise (par défaut 100 m)</p>
+                  </div>
+                </div>
+
                 {canEdit ? (
                   <button onClick={handleCompanySave} disabled={companySaving}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm hover:opacity-90"
