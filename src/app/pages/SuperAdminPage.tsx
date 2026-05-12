@@ -31,7 +31,7 @@ function SuperAdminLogin({ onLogin }: { onLogin: () => void }) {
       if (msg.toLowerCase().includes("incorrect") || msg.toLowerCase().includes("401")) {
         setError("Mot de passe incorrect");
       } else {
-        setError("Impossible de joindre le serveur. Vérifiez que le backend tourne sur le port 3001.");
+        setError("Impossible de joindre le serveur. Vérifiez que le backend tourne sur le port 3002.");
       }
     } finally {
       setLoading(false);
