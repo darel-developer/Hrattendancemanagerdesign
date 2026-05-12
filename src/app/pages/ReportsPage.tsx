@@ -123,8 +123,45 @@ function downloadReportTxt(r: Report, senderName: string) {
   URL.revokeObjectURL(url);
 }
 
+// ─── Word (.doc) Generator ──────────────────────────────────────────────────
+function generateWord(title: string, content: string, authorName: string, headerImage: string | null) {
+  const today = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const headerHtml = headerImage
+    ? `<div style="margin-bottom:24pt;"><img src="${headerImage}" style="max-width:100%;max-height:130px;display:block;" /></div>`
+    : `<div style="border-bottom:2pt solid #4F46E5;padding-bottom:12pt;margin-bottom:20pt;">
+         <p style="font-size:18pt;font-weight:800;color:#4F46E5;margin:0;">HR Manager</p>
+       </div>`;
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
+<head><meta charset="UTF-8">
+<style>
+  body{font-family:Arial,sans-serif;font-size:12pt;margin:40pt;color:#111827;}
+  h1{font-size:17pt;color:#4F46E5;margin:0 0 6pt;}
+  .meta{font-size:10pt;color:#6B7280;margin-bottom:20pt;}
+  .content{font-size:12pt;line-height:1.8;white-space:pre-wrap;border-top:1pt solid #E5E7EB;padding-top:16pt;}
+  .footer{margin-top:40pt;font-size:9pt;color:#9CA3AF;border-top:1pt solid #E5E7EB;padding-top:8pt;}
+</style>
+</head>
+<body>
+  ${headerHtml}
+  <h1>${title.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</h1>
+  <p class="meta">De : ${authorName} &nbsp;·&nbsp; ${today}</p>
+  <div class="content">${content.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+  <div class="footer">HR Manager — Document confidentiel &nbsp;·&nbsp; ${today}</div>
+</body></html>`;
+  const blob = new Blob(["﻿", html], { type: "application/msword" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `rapport_${title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.doc`;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ─── PDF Generator ─────────────────────────────────────────────────────────
-async function generatePDF(reportType: string, empList: Employee[], leaveList: LeaveRequest[]) {
+async function generatePDF(reportType: string, empList: Employee[], leaveList: LeaveRequest[], headerImage?: string | null) {
   const today = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const totalSalary = empList.reduce((s, e) => s + (e.salary ?? 0), 0);
   const activeCount = empList.filter((e) => e.status === "Actif").length;
@@ -172,7 +209,8 @@ async function generatePDF(reportType: string, empList: Employee[], leaveList: L
       </style>
     </head>
     <body>
-      <div class="header">
+      ${headerImage ? `<div style="padding:16px 40px 0;"><img src="${headerImage}" style="max-height:100px;display:block;" /></div>` : ""}
+      <div class="header" style="${headerImage ? "border-radius:0;" : ""}">
         <h1>HR Manager — ${reportType}</h1>
         <p>Rapport généré automatiquement par la plateforme RH</p>
         <p class="date">Généré le ${today}</p>
@@ -349,8 +387,50 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
     customEmail: "",
     includeData: true,
   });
+  const [headerImage, setHeaderImage] = useState<string | null>(null);
+  const [showFormatPicker, setShowFormatPicker] = useState(false);
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleHeaderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setHeaderImage(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.name.endsWith(".txt")) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        setForm((p) => ({ ...p, content: text, title: p.title || file.name.replace(/\.txt$/i, "") }));
+      };
+      reader.readAsText(file);
+    } else {
+      setForm((p) => ({ ...p, title: p.title || file.name.replace(/\.[^/.]+$/, "") }));
+      alert("Seuls les fichiers .txt peuvent être importés directement. Pour les autres formats, copiez-collez le contenu dans le champ Contenu.");
+    }
+    e.target.value = "";
+  };
+
+  const handleDownload = (format: "pdf" | "word") => {
+    setShowFormatPicker(false);
+    if (format === "pdf") {
+      generatePDF(form.title || form.type, allEmployees, allLeaves, headerImage);
+    } else {
+      generateWord(
+        form.title || form.type,
+        form.content,
+        `${currentUser?.firstName} ${currentUser?.lastName}`,
+        headerImage
+      );
+    }
+  };
 
   useEffect(() => {
     leavesApi.getAll().then(setAllLeaves).catch(console.error);
@@ -555,6 +635,36 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
             </div>
           </div>
 
+          {/* En-tête + Import */}
+          <div className="flex gap-2">
+            <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs cursor-pointer hover:opacity-80 transition-all flex-1 justify-center"
+              style={{ border: "1.5px dashed var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600, background: headerImage ? "rgba(99,102,241,0.06)" : "var(--hr-hover)" }}
+            >
+              {headerImage ? (
+                <img src={headerImage} alt="en-tête" className="h-6 object-contain" />
+              ) : (
+                <><FileText size={12} />En-tête document</>
+              )}
+              <input type="file" accept="image/*" className="hidden" onChange={handleHeaderUpload} />
+            </label>
+            {headerImage && (
+              <button onClick={() => setHeaderImage(null)}
+                className="px-2 py-2 rounded-xl text-xs hover:opacity-80"
+                style={{ background: "#FEE2E2", color: "#DC2626" }}
+                title="Supprimer l'en-tête"
+              >
+                <X size={12} />
+              </button>
+            )}
+            <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs cursor-pointer hover:opacity-80 transition-all flex-1 justify-center"
+              style={{ border: "1.5px dashed var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600, background: "var(--hr-hover)" }}
+            >
+              <Download size={12} />
+              Importer un fichier
+              <input type="file" accept=".txt,.doc,.docx,.pdf" className="hidden" onChange={handleImportFile} />
+            </label>
+          </div>
+
           <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "var(--hr-hover)", border: "1px solid var(--hr-card-border-hard)" }}>
             <input
               type="checkbox"
@@ -576,29 +686,53 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
           >
             Annuler
           </button>
-          <button
-            onClick={() => generatePDF(form.title || form.type, allEmployees, allLeaves)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all hover:opacity-80"
-            style={{ border: "1.5px solid #6366F1", color: "#6366F1", fontWeight: 700, background: "rgba(99,102,241,0.08)" }}
-          >
-            <Printer size={14} />
-            Prévisualiser PDF
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={loading || !form.title || !form.content || (!form.recipientId && !form.customEmail)}
-            className="flex items-center gap-2 flex-1 py-2.5 justify-center rounded-xl text-white text-sm transition-all hover:opacity-90 disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
-          >
-            {loading ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <>
-                <Send size={14} />
-                Envoyer le rapport
-              </>
-            )}
-          </button>
+
+          {/* Format picker */}
+          {showFormatPicker ? (
+            <div className="flex gap-2 flex-1">
+              <button onClick={() => handleDownload("pdf")}
+                className="flex items-center gap-1.5 flex-1 py-2.5 justify-center rounded-xl text-sm transition-all hover:opacity-80"
+                style={{ border: "1.5px solid #EF4444", color: "#EF4444", fontWeight: 700, background: "rgba(239,68,68,0.08)" }}
+              >
+                <Printer size={13} />PDF
+              </button>
+              <button onClick={() => handleDownload("word")}
+                className="flex items-center gap-1.5 flex-1 py-2.5 justify-center rounded-xl text-sm transition-all hover:opacity-80"
+                style={{ border: "1.5px solid #2563EB", color: "#2563EB", fontWeight: 700, background: "rgba(37,99,235,0.08)" }}
+              >
+                <FileText size={13} />Word
+              </button>
+              <button onClick={() => setShowFormatPicker(false)}
+                className="px-3 py-2.5 rounded-xl"
+                style={{ border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-muted)" }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShowFormatPicker(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all hover:opacity-80"
+              style={{ border: "1.5px solid #6366F1", color: "#6366F1", fontWeight: 700, background: "rgba(99,102,241,0.08)" }}
+            >
+              <Download size={14} />
+              Télécharger
+            </button>
+          )}
+
+          {!showFormatPicker && (
+            <button
+              onClick={handleSend}
+              disabled={loading || !form.title || !form.content || (!form.recipientId && !form.customEmail)}
+              className="flex items-center gap-2 flex-1 py-2.5 justify-center rounded-xl text-white text-sm transition-all hover:opacity-90 disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <><Send size={14} />Envoyer</>
+              )}
+            </button>
+          )}
         </div>
       </motion.div>
     </motion.div>

@@ -34,7 +34,6 @@ function mapEmployee(row) {
 
 // Valeurs acceptées pour les champs enum
 const VALID_ROLES = ['Admin', 'Manager', 'Employee'];
-const VALID_DEPTS = ['Ingénierie', 'RH', 'Marketing', 'Finance', 'Direction', 'Design'];
 const VALID_CONTRACTS = ['CDI', 'CDD', 'Stage', 'Freelance'];
 const VALID_STATUSES = ['Actif', 'Inactif', 'En congé'];
 
@@ -44,7 +43,7 @@ function validateEmployee(e) {
   if (!e.email     || typeof e.email     !== 'string' || e.email.length > 255)      return 'Email invalide';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email))                                 return 'Format email invalide';
   if (e.role       && !VALID_ROLES.includes(e.role))       return 'Rôle invalide';
-  if (e.department && !VALID_DEPTS.includes(e.department)) return 'Département invalide';
+  if (e.department && (typeof e.department !== 'string' || e.department.length > 100)) return 'Département invalide';
   if (e.contractType && !VALID_CONTRACTS.includes(e.contractType)) return 'Type de contrat invalide';
   if (e.status     && !VALID_STATUSES.includes(e.status))  return 'Statut invalide';
   if (e.salary !== undefined && e.salary !== null && (isNaN(parseFloat(e.salary)) || parseFloat(e.salary) < 0)) return 'Salaire invalide';

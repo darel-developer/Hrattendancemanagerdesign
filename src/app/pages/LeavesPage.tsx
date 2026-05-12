@@ -446,7 +446,7 @@ export function LeavesPage() {
           const typeClr = leaveTypeColors[l.type];
           const isOwn = l.employeeId === currentUser?.id;
           const isMgr = role === "Manager" && employees.find((e) => e.id === l.employeeId)?.department === currentUser?.department;
-          const canReview = (role === "Admin" || (role === "Manager" && !isOwn && isMgr)) && l.status === "En attente";
+          const canReview = role === "Admin" && l.status === "En attente";
 
           return (
             <motion.div key={l.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
