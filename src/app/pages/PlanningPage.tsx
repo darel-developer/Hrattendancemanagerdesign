@@ -215,7 +215,7 @@ export function PlanningPage() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 20000);
+    const t = setInterval(load, 15000);
     return () => clearInterval(t);
   }, [monday.toISOString()]);
 

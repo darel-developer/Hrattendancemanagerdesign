@@ -195,6 +195,45 @@ async function generateMonthlyReport() {
   }
 }
 
+// ─── Recalcul des statuts de pointage du jour ─────────────────────────────────
+// Corrige les enregistrements "Présent" qui auraient dû être "Retard" en se basant
+// sur l'heure de pointage réelle et les paramètres work_start / late_tolerance de l'entreprise.
+async function recalculateTodayAttendanceStatuses() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const [companies] = await db.query('SELECT id, work_start, late_tolerance FROM companies');
+    let fixed = 0;
+    for (const company of companies) {
+      const workStart = String(company.work_start || '09:00').slice(0, 5);
+      const lateTol = company.late_tolerance ?? 5;
+      const [wh, wm] = workStart.split(':').map(Number);
+      const limitMinutes = wh * 60 + wm + lateTol;
+
+      const [empRows] = await db.query("SELECT id FROM employees WHERE company_id = ?", [company.id]);
+      if (empRows.length === 0) continue;
+      const empIds = empRows.map(e => e.id);
+      const ph = empIds.map(() => '?').join(',');
+
+      const [records] = await db.query(
+        `SELECT id, check_in FROM attendance_records
+         WHERE date = ? AND status = 'Présent' AND check_in IS NOT NULL AND employee_id IN (${ph})`,
+        [today, ...empIds]
+      );
+      for (const rec of records) {
+        const ci = String(rec.check_in).slice(0, 5);
+        const [ch, cm] = ci.split(':').map(Number);
+        if (ch * 60 + cm > limitMinutes) {
+          await db.query("UPDATE attendance_records SET status = 'Retard' WHERE id = ?", [rec.id]);
+          fixed++;
+        }
+      }
+    }
+    if (fixed > 0) console.log(`[Auto] ${fixed} statut(s) corrigé(s) → Retard`);
+  } catch (err) {
+    console.error('[Auto] Erreur recalcul statuts :', err.message);
+  }
+}
+
 function scheduleAutoNotifications() {
   const now = new Date();
 
@@ -263,6 +302,19 @@ app.listen(PORT, async () => {
   } catch (err) {
     console.error('[DB] Erreur migration department :', err.message);
   }
+  // Ajouter colonne work_days si absente
+  try {
+    const [wdCols] = await db.query("SHOW COLUMNS FROM employees LIKE 'work_days'");
+    if (wdCols.length === 0) {
+      await db.query("ALTER TABLE employees ADD COLUMN work_days VARCHAR(255) DEFAULT NULL");
+      console.log('[DB] Colonne work_days ajoutée');
+    }
+  } catch (err) {
+    console.error('[DB] Erreur migration work_days :', err.message);
+  }
+  // Corriger les statuts de pointage du jour mal enregistrés
+  recalculateTodayAttendanceStatuses().catch((err) => console.error('[Auto] Recalcul statuts :', err.message));
+
   scheduleAutoNotifications();
 
   // ─── Backup automatique ──────────────────────────────────────────────────

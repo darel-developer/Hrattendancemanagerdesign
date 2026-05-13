@@ -314,12 +314,24 @@ function ReadReportModal({ report, sender, onClose, onMarkRead }: {
   onClose: () => void;
   onMarkRead: () => void;
 }) {
+  const [showFmt, setShowFmt] = useState(false);
+  const senderName = sender ? `${sender.firstName} ${sender.lastName}` : report.senderId;
+
   useEffect(() => {
     if (!report.isRead) {
       reportsApi.markRead(report.id).catch(console.error);
       onMarkRead();
     }
   }, [report.id]);
+
+  const handleDownload = (fmt: "pdf" | "word") => {
+    setShowFmt(false);
+    if (fmt === "word") {
+      generateWord(report.title, report.content, senderName, null);
+    } else {
+      downloadReportTxt(report, senderName);
+    }
+  };
 
   return (
     <motion.div
@@ -341,7 +353,7 @@ function ReadReportModal({ report, sender, onClose, onMarkRead }: {
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--hr-badge-bg)", color: "var(--hr-badge-text)" }}>{report.type}</span>
               <span className="text-xs" style={{ color: "var(--hr-text-light)" }}>
-                De : {sender ? `${sender.firstName} ${sender.lastName}` : report.senderId}
+                De : {senderName}
               </span>
               <span className="text-xs" style={{ color: "var(--hr-text-light)" }}>
                 · {new Date(report.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
@@ -359,12 +371,40 @@ function ReadReportModal({ report, sender, onClose, onMarkRead }: {
           {report.content}
         </div>
 
-        <button onClick={onClose}
-          className="mt-5 w-full py-2.5 rounded-xl text-sm"
-          style={{ background: "var(--hr-hover)", color: "var(--hr-text-muted)", fontWeight: 600, border: "1px solid var(--hr-card-border-hard)" }}
-        >
-          Fermer
-        </button>
+        <div className="flex gap-3 mt-5">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl text-sm"
+            style={{ background: "var(--hr-hover)", color: "var(--hr-text-muted)", fontWeight: 600, border: "1px solid var(--hr-card-border-hard)" }}
+          >
+            Fermer
+          </button>
+          {showFmt ? (
+            <div className="flex gap-2 flex-1">
+              <button onClick={() => handleDownload("pdf")}
+                className="flex items-center gap-1.5 flex-1 py-2.5 justify-center rounded-xl text-sm hover:opacity-80"
+                style={{ border: "1.5px solid #EF4444", color: "#EF4444", fontWeight: 700, background: "rgba(239,68,68,0.08)" }}
+              >
+                <Printer size={13} />TXT/PDF
+              </button>
+              <button onClick={() => handleDownload("word")}
+                className="flex items-center gap-1.5 flex-1 py-2.5 justify-center rounded-xl text-sm hover:opacity-80"
+                style={{ border: "1.5px solid #2563EB", color: "#2563EB", fontWeight: 700, background: "rgba(37,99,235,0.08)" }}
+              >
+                <FileText size={13} />Word
+              </button>
+              <button onClick={() => setShowFmt(false)} className="px-3 py-2.5 rounded-xl" style={{ border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-muted)" }}>
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShowFmt(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm hover:opacity-80"
+              style={{ border: "1.5px solid #6366F1", color: "#6366F1", fontWeight: 700, background: "rgba(99,102,241,0.08)" }}
+            >
+              <Download size={14} />Télécharger
+            </button>
+          )}
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -388,7 +428,6 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
     includeData: true,
   });
   const [headerImage, setHeaderImage] = useState<string | null>(null);
-  const [showFormatPicker, setShowFormatPicker] = useState(false);
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -404,39 +443,38 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const baseName = file.name.replace(/\.[^/.]+$/, "");
     if (file.name.endsWith(".txt")) {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const text = ev.target?.result as string;
-        setForm((p) => ({ ...p, content: text, title: p.title || file.name.replace(/\.txt$/i, "") }));
+        setForm((p) => ({ ...p, content: text, title: p.title || baseName }));
       };
       reader.readAsText(file);
+    } else if (file.name.endsWith(".pdf")) {
+      setForm((p) => ({ ...p, title: p.title || baseName, content: p.content || `[Contenu importé depuis ${file.name}]\n\nCe fichier PDF a été joint au rapport. Copiez-collez son contenu ici si nécessaire.` }));
+    } else if (file.name.endsWith(".docx") || file.name.endsWith(".doc")) {
+      setForm((p) => ({ ...p, title: p.title || baseName, content: p.content || `[Contenu importé depuis ${file.name}]\n\nCe fichier Word a été joint au rapport. Copiez-collez son contenu ici si nécessaire.` }));
     } else {
-      setForm((p) => ({ ...p, title: p.title || file.name.replace(/\.[^/.]+$/, "") }));
-      alert("Seuls les fichiers .txt peuvent être importés directement. Pour les autres formats, copiez-collez le contenu dans le champ Contenu.");
+      setForm((p) => ({ ...p, title: p.title || baseName }));
     }
     e.target.value = "";
-  };
-
-  const handleDownload = (format: "pdf" | "word") => {
-    setShowFormatPicker(false);
-    if (format === "pdf") {
-      generatePDF(form.title || form.type, allEmployees, allLeaves, headerImage);
-    } else {
-      generateWord(
-        form.title || form.type,
-        form.content,
-        `${currentUser?.firstName} ${currentUser?.lastName}`,
-        headerImage
-      );
-    }
   };
 
   useEffect(() => {
     leavesApi.getAll().then(setAllLeaves).catch(console.error);
   }, []);
 
-  const recipients = allEmployees.filter((e) => e.id !== currentUser?.id);
+  const recipients = allEmployees.filter((e) => {
+    if (e.id === currentUser?.id) return false;
+    if (currentUser?.role === "Admin") return true;
+    if (currentUser?.role === "Manager") {
+      // Manager can send to: their team + other managers + admins
+      return e.department === currentUser.department || e.role === "Manager" || e.role === "Admin";
+    }
+    // Employee can send to: their manager + admins
+    return e.id === currentUser?.managerId || e.role === "Admin";
+  });
 
   const handleSend = async () => {
     if (!form.title || !form.content || (!form.recipientId && !form.customEmail)) return;
@@ -462,11 +500,6 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
       console.error("Erreur envoi rapport:", err);
     }
     setLoading(false);
-  };
-
-  const handleExportAndSend = async () => {
-    await generatePDF(form.title || form.type, allEmployees, allLeaves);
-    handleSend();
   };
 
   if (sent) {
@@ -686,53 +719,18 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
           >
             Annuler
           </button>
-
-          {/* Format picker */}
-          {showFormatPicker ? (
-            <div className="flex gap-2 flex-1">
-              <button onClick={() => handleDownload("pdf")}
-                className="flex items-center gap-1.5 flex-1 py-2.5 justify-center rounded-xl text-sm transition-all hover:opacity-80"
-                style={{ border: "1.5px solid #EF4444", color: "#EF4444", fontWeight: 700, background: "rgba(239,68,68,0.08)" }}
-              >
-                <Printer size={13} />PDF
-              </button>
-              <button onClick={() => handleDownload("word")}
-                className="flex items-center gap-1.5 flex-1 py-2.5 justify-center rounded-xl text-sm transition-all hover:opacity-80"
-                style={{ border: "1.5px solid #2563EB", color: "#2563EB", fontWeight: 700, background: "rgba(37,99,235,0.08)" }}
-              >
-                <FileText size={13} />Word
-              </button>
-              <button onClick={() => setShowFormatPicker(false)}
-                className="px-3 py-2.5 rounded-xl"
-                style={{ border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-muted)" }}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ) : (
-            <button onClick={() => setShowFormatPicker(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all hover:opacity-80"
-              style={{ border: "1.5px solid #6366F1", color: "#6366F1", fontWeight: 700, background: "rgba(99,102,241,0.08)" }}
-            >
-              <Download size={14} />
-              Télécharger
-            </button>
-          )}
-
-          {!showFormatPicker && (
-            <button
-              onClick={handleSend}
-              disabled={loading || !form.title || !form.content || (!form.recipientId && !form.customEmail)}
-              className="flex items-center gap-2 flex-1 py-2.5 justify-center rounded-xl text-white text-sm transition-all hover:opacity-90 disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
-            >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <><Send size={14} />Envoyer</>
-              )}
-            </button>
-          )}
+          <button
+            onClick={handleSend}
+            disabled={loading || !form.title || !form.content || (!form.recipientId && !form.customEmail)}
+            className="flex items-center gap-2 flex-1 py-2.5 justify-center rounded-xl text-white text-sm transition-all hover:opacity-90 disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
+          >
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <><Send size={14} />Envoyer</>
+            )}
+          </button>
         </div>
       </motion.div>
     </motion.div>
@@ -771,7 +769,7 @@ export function ReportsPage() {
       reportsApi.getSent(currentUser.id).then(setSentReports).catch(console.error);
     };
     fetchReports();
-    const t = setInterval(fetchReports, 30000);
+    const t = setInterval(fetchReports, 20000);
     return () => clearInterval(t);
   }, [currentUser?.id]);
 

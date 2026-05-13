@@ -87,7 +87,7 @@ function AdminDashboard() {
         .catch(console.error);
     };
     fetch();
-    const t = setInterval(fetch, 15000);
+    const t = setInterval(fetch, 10000);
     return () => clearInterval(t);
   }, [today, currentUser?.companyId]);
 
@@ -102,11 +102,15 @@ function AdminDashboard() {
   });
   const weekLabel = `${new Date(weekDates[0] + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })} – ${new Date(weekDates[6] + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`;
 
+  const activeEmployees = employees.filter((e) => e.status === "Actif");
+  const onLeaveTodayIds = new Set(
+    allLeaves.filter((l) => l.status === "Approuvé" && l.startDate <= today && l.endDate >= today).map((l) => l.employeeId)
+  );
   const presentCount = todayRecords.filter((r) => r.status === "Présent" || r.status === "Télétravail").length;
-  const absentCount = todayRecords.filter((r) => r.status === "Absent").length;
   const lateCount = todayRecords.filter((r) => r.status === "Retard").length;
+  const leaveCount = activeEmployees.filter((e) => onLeaveTodayIds.has(e.id)).length;
+  const absentCount = activeEmployees.filter((e) => !todayRecords.some((r) => r.employeeId === e.id) && !onLeaveTodayIds.has(e.id)).length;
   const pendingLeaves = allLeaves.filter((l) => l.status === "En attente").length;
-  const activeEmployees = employees.filter((e) => e.status === "Actif").length;
 
   const pendingLeavesList = allLeaves
     .filter((l) => l.status === "En attente")
@@ -135,8 +139,8 @@ function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard title="Employés actifs" value={activeEmployees} change="+1 ce mois" changeType="up" icon={Users} color="#6366F1" bg="#EDE9FE" delay={0.05} />
-        <StatCard title="Présents aujourd'hui" value={presentCount} change={`${Math.round((presentCount / employees.length) * 100)}% du total`} changeType="up" icon={UserCheck} color="#10B981" bg="#D1FAE5" delay={0.1} />
+        <StatCard title="Employés actifs" value={activeEmployees.length} change="+1 ce mois" changeType="up" icon={Users} color="#6366F1" bg="#EDE9FE" delay={0.05} />
+        <StatCard title="Présents aujourd'hui" value={presentCount} change={`${Math.round((presentCount / Math.max(activeEmployees.length, 1)) * 100)}% du total`} changeType="up" icon={UserCheck} color="#10B981" bg="#D1FAE5" delay={0.1} />
         <StatCard title="Absences / Retards" value={absentCount + lateCount} change={`${absentCount} absents, ${lateCount} retards`} changeType={absentCount + lateCount > 2 ? "down" : "neutral"} icon={UserX} color="#EF4444" bg="#FEE2E2" delay={0.15} />
         <StatCard title="Congés en attente" value={pendingLeaves} change="À valider" changeType="neutral" icon={CalendarDays} color="#F59E0B" bg="#FEF3C7" delay={0.2} />
       </div>
@@ -301,15 +305,19 @@ function ManagerDashboard() {
         .catch(console.error);
     };
     fetch();
-    const t = setInterval(fetch, 15000);
+    const t = setInterval(fetch, 10000);
     return () => clearInterval(t);
   }, [today]);
 
   const myDept = currentUser?.department;
-  const deptEmployees = employees.filter((e) => e.department === myDept);
+  const deptEmployees = employees.filter((e) => e.department === myDept && e.status === "Actif");
   const todayRecords = todayAllRecords.filter((r) => deptEmployees.some((e) => e.id === r.employeeId));
+  const onLeaveTodayDept = new Set(
+    allLeaves.filter((l) => l.status === "Approuvé" && l.startDate <= today && l.endDate >= today && deptEmployees.some((e) => e.id === l.employeeId)).map((l) => l.employeeId)
+  );
   const presentCount = todayRecords.filter((r) => r.status === "Présent" || r.status === "Télétravail").length;
-  const absentCount = todayRecords.filter((r) => r.status === "Absent").length;
+  const lateCount = todayRecords.filter((r) => r.status === "Retard").length;
+  const absentCount = deptEmployees.filter((e) => !todayRecords.some((r) => r.employeeId === e.id) && !onLeaveTodayDept.has(e.id)).length;
   const deptLeavesPending = allLeaves.filter((l) => l.status === "En attente" && deptEmployees.some((e) => e.id === l.employeeId)).length;
 
   return (
@@ -335,7 +343,7 @@ function ManagerDashboard() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard title="Membres" value={deptEmployees.length} change={`Dept. ${myDept}`} changeType="neutral" icon={Users} color="#6366F1" bg="#EDE9FE" delay={0.05} />
         <StatCard title="Présents" value={presentCount} change={`${Math.round((presentCount / Math.max(deptEmployees.length, 1)) * 100)}%`} changeType="up" icon={UserCheck} color="#10B981" bg="#D1FAE5" delay={0.1} />
-        <StatCard title="Absents" value={absentCount} change="Aujourd'hui" changeType={absentCount > 0 ? "down" : "neutral"} icon={UserX} color="#EF4444" bg="#FEE2E2" delay={0.15} />
+        <StatCard title="Abs. / Retards" value={absentCount + lateCount} change={`${absentCount} absents · ${lateCount} retards`} changeType={absentCount + lateCount > 0 ? "down" : "neutral"} icon={UserX} color="#EF4444" bg="#FEE2E2" delay={0.15} />
         <StatCard title="Congés en attente" value={deptLeavesPending} change="Votre équipe" changeType="neutral" icon={CalendarDays} color="#F59E0B" bg="#FEF3C7" delay={0.2} />
       </div>
 
@@ -407,7 +415,7 @@ function EmployeeDashboard() {
         .catch(console.error);
     };
     fetch();
-    const t = setInterval(fetch, 30000);
+    const t = setInterval(fetch, 20000);
     return () => clearInterval(t);
   }, [currentUser?.id]);
 
@@ -479,16 +487,22 @@ function EmployeeDashboard() {
                   {todayRecord.checkOut ?? "En cours…"}
                 </span>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-xl" style={{ background: "var(--hr-hover)" }}>
-                <span className="text-sm" style={{ color: "var(--hr-text-muted)" }}>Statut</span>
-                <span className="text-xs px-2.5 py-1 rounded-full" style={{
-                  background: todayRecord.status === "Présent" ? "#D1FAE5" : "#FEF3C7",
-                  color: todayRecord.status === "Présent" ? "#16A34A" : "#D97706",
-                  fontWeight: 700,
-                }}>
-                  {todayRecord.status}
-                </span>
-              </div>
+              {(() => {
+                const sBg: Record<string, string> = { "Présent": "#D1FAE5", "Retard": "#FEF3C7", "Absent": "#FEE2E2", "Congé": "#EDE9FE", "Télétravail": "#CCFBF1" };
+                const sTxt: Record<string, string> = { "Présent": "#16A34A", "Retard": "#D97706", "Absent": "#DC2626", "Congé": "#7C3AED", "Télétravail": "#0D9488" };
+                return (
+                  <div className="flex items-center justify-between p-3 rounded-xl" style={{ background: "var(--hr-hover)" }}>
+                    <span className="text-sm" style={{ color: "var(--hr-text-muted)" }}>Statut</span>
+                    <span className="text-xs px-2.5 py-1 rounded-full" style={{
+                      background: sBg[todayRecord.status] ?? "#F3F4F6",
+                      color: sTxt[todayRecord.status] ?? "#6B7280",
+                      fontWeight: 700,
+                    }}>
+                      {todayRecord.status}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <div className="text-center py-6">

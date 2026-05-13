@@ -46,7 +46,10 @@ export const router = createBrowserRouter([
         element: <RequireRole roles={["Admin", "Manager", "Employee"]}><EmployeeDetailPage /></RequireRole>,
       },
       { path: "attendance", Component: AttendancePage },
-      { path: "calendar", Component: CalendarPage },
+      {
+        path: "calendar",
+        element: <RequireRole roles={["Admin", "Manager"]}><CalendarPage /></RequireRole>,
+      },
       { path: "leaves", Component: LeavesPage },
       { path: "reports", Component: ReportsPage },
       { path: "notifications", Component: NotificationsPage },

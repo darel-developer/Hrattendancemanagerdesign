@@ -16,6 +16,8 @@ async function hashPassword(plain) {
   return sha256(plain);
 }
 
+const ALL_WORK_DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+
 function mapEmployee(row) {
   return {
     id: row.id,
@@ -32,11 +34,12 @@ function mapEmployee(row) {
     startDate: row.start_date || null,
     salary: row.salary !== null ? parseFloat(row.salary) : null,
     status: row.status,
-    managerId: row.manager_id || null,   // ← corrigé: était "manager"
+    managerId: row.manager_id || null,
     address: row.address,
     birthDate: row.birth_date || null,
     leaveBalance: row.leave_balance,
     leaveUsed: row.leave_used,
+    workDays: row.work_days ? row.work_days.split(',') : ALL_WORK_DAYS,
     // password_hash et pin intentionnellement exclus
   };
 }
@@ -106,12 +109,13 @@ router.post('/', requireAuth, requireRole('Admin'), async (req, res) => {
     // Forcer le companyId depuis le token pour éviter les injections cross-tenant
     const companyId = req.user.companyId;
 
+    const workDaysStr = Array.isArray(e.workDays) && e.workDays.length ? e.workDays.join(',') : null;
     await db.query(
       `INSERT INTO employees
         (id, company_id, first_name, last_name, email, phone, avatar, role, department, position,
          contract_type, start_date, salary, status, manager_id, address, birth_date,
-         leave_balance, leave_used, password_hash, pin)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         leave_balance, leave_used, password_hash, pin, work_days)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         e.id, companyId,
         e.firstName, e.lastName, e.email, e.phone || '', e.avatar || '',
@@ -119,7 +123,7 @@ router.post('/', requireAuth, requireRole('Admin'), async (req, res) => {
         e.startDate || null, e.salary || null, e.status,
         e.managerId || e.manager || null,
         e.address || '', e.birthDate || null, e.leaveBalance ?? 25, e.leaveUsed ?? 0,
-        passwordHash, pin,
+        passwordHash, pin, workDaysStr,
       ]
     );
     const [rows] = await db.query('SELECT * FROM employees WHERE id = ?', [e.id]);
@@ -144,11 +148,12 @@ router.put('/:id', requireAuth, async (req, res) => {
     const valErr = validateEmployee(e);
     if (valErr) return res.status(400).json({ error: valErr });
 
+    const updWorkDays = Array.isArray(e.workDays) && e.workDays.length ? e.workDays.join(',') : null;
     await db.query(
       `UPDATE employees SET
         first_name=?, last_name=?, email=?, phone=?, avatar=?, role=?, department=?,
         position=?, contract_type=?, start_date=?, salary=?, status=?, manager_id=?,
-        address=?, birth_date=?, leave_balance=?, leave_used=?, pin=?
+        address=?, birth_date=?, leave_balance=?, leave_used=?, pin=?, work_days=?
        WHERE id=?`,
       [
         e.firstName, e.lastName, e.email, e.phone || '', e.avatar || '',
@@ -156,7 +161,7 @@ router.put('/:id', requireAuth, async (req, res) => {
         e.startDate || null, e.salary || null, e.status,
         e.managerId || e.manager || null,
         e.address || '', e.birthDate || null, e.leaveBalance ?? 25, e.leaveUsed ?? 0,
-        e.pin ? String(e.pin) : null,
+        e.pin ? String(e.pin) : null, updWorkDays,
         req.params.id,
       ]
     );

@@ -558,6 +558,8 @@ interface AddEmployeeModalProps {
   onSwitchToImport: () => void;
 }
 
+const ALL_WORK_DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+
 function AddEmployeeModal({ onClose, onAdd, allEmployees, departments, onCreateDept, onSwitchToImport }: AddEmployeeModalProps) {
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "",
@@ -565,6 +567,7 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees, departments, onCreateD
     position: "", contractType: "CDI" as any, role: "Employee" as any,
     startDate: "", address: "", birthDate: "", salary: "", managerId: "", password: "", pin: "",
   });
+  const [workDays, setWorkDays] = useState<string[]>([...ALL_WORK_DAYS]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -595,9 +598,10 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees, departments, onCreateD
       role: form.role, department: form.department, position: form.position,
       contractType: form.contractType,
       startDate: form.startDate || new Date().toISOString().split("T")[0],
-      salary, status: "Actif", manager: form.managerId || null,
+      salary, status: "Actif", managerId: form.managerId || null,
       address: form.address, birthDate: form.birthDate,
       leaveBalance: 25, leaveUsed: 0,
+      workDays: workDays.length === ALL_WORK_DAYS.length ? undefined : workDays,
       password: form.password || "admin1234", pin: form.pin || "1234",
     };
     setLoading(true);
@@ -727,6 +731,34 @@ function AddEmployeeModal({ onClose, onAdd, allEmployees, departments, onCreateD
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
               style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }} />
           </div>
+          <div className="col-span-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Jours de travail</label>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setWorkDays([...ALL_WORK_DAYS])} className="text-xs px-2 py-0.5 rounded-lg hover:opacity-80" style={{ color: "#6366F1", fontWeight: 600 }}>Tous</button>
+                <button type="button" onClick={() => setWorkDays(["Lundi","Mardi","Mercredi","Jeudi","Vendredi"])} className="text-xs px-2 py-0.5 rounded-lg hover:opacity-80" style={{ color: "#6366F1", fontWeight: 600 }}>Sem.</button>
+              </div>
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {ALL_WORK_DAYS.map((day) => {
+                const active = workDays.includes(day);
+                return (
+                  <button type="button" key={day}
+                    onClick={() => setWorkDays((p) => active ? p.filter((d) => d !== day) : [...p, day])}
+                    className="px-2.5 py-1.5 rounded-lg text-xs transition-all"
+                    style={{
+                      background: active ? "rgba(99,102,241,0.15)" : "var(--hr-input-bg)",
+                      border: `1.5px solid ${active ? "#6366F1" : "var(--hr-card-border-hard)"}`,
+                      color: active ? "#6366F1" : "var(--hr-text-muted)",
+                      fontWeight: active ? 700 : 400,
+                    }}
+                  >
+                    {day.slice(0, 3)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
         {form.salary && !isNaN(parseFloat(form.salary)) && (
           <div className="mt-4 p-3 rounded-xl" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.2)" }}>
@@ -807,7 +839,7 @@ function EditEmployeeModal({ emp, onClose, onSave, allEmployees, departments, on
         phone: form.phone, position: form.position, department: form.department,
         contractType: form.contractType, role: form.role,
         startDate: form.startDate || null, birthDate: form.birthDate || null,
-        salary, manager: form.managerId || null, address: form.address,
+        salary, managerId: form.managerId || null, address: form.address,
         status: form.status,
         ...(form.password ? { password: form.password } : {}),
       });

@@ -39,6 +39,25 @@ router.post('/', requireAuth, async (req, res) => {
   try {
     const r = req.body;
     const id = r.id || `ATT${Date.now()}`;
+
+    // Auto-compute status at check-in time using company work_start + late_tolerance
+    let status = r.status;
+    if (r.checkIn && !r.checkOut && r.status !== 'Télétravail' && r.status !== 'Congé') {
+      try {
+        const [empRows] = await db.query('SELECT company_id FROM employees WHERE id = ?', [r.employeeId]);
+        if (empRows.length > 0) {
+          const [compRows] = await db.query('SELECT work_start, late_tolerance FROM companies WHERE id = ?', [empRows[0].company_id]);
+          if (compRows.length > 0) {
+            const workStart = String(compRows[0].work_start || '09:00').slice(0, 5);
+            const lateTol = compRows[0].late_tolerance ?? 5;
+            const [wh, wm] = workStart.split(':').map(Number);
+            const [ch, cm] = r.checkIn.split(':').map(Number);
+            status = (ch * 60 + cm) > (wh * 60 + wm + lateTol) ? 'Retard' : 'Présent';
+          }
+        }
+      } catch (_) { /* keep client-submitted status as fallback */ }
+    }
+
     await db.query(
       `INSERT INTO attendance_records
         (id, employee_id, date, check_in, check_out, status, hours_worked, note)
@@ -47,11 +66,11 @@ router.post('/', requireAuth, async (req, res) => {
         check_in=VALUES(check_in), check_out=VALUES(check_out),
         status=VALUES(status), hours_worked=VALUES(hours_worked), note=VALUES(note)`,
       [id, r.employeeId, r.date, r.checkIn || null, r.checkOut || null,
-       r.status, r.hoursWorked ?? null, r.note || '']
+       status, r.hoursWorked ?? null, r.note || '']
     );
     const [rows] = await db.query('SELECT * FROM attendance_records WHERE id = ?', [id]);
     const action = r.checkIn && !r.checkOut ? 'check-in' : r.checkOut ? 'check-out' : 'enregistrement';
-    console.info(`[Attendance] ${action} — employé ${r.employeeId} le ${r.date}`);
+    console.info(`[Attendance] ${action} — employé ${r.employeeId} le ${r.date} (${status})`);
     res.status(201).json(mapRecord(rows[0]));
   } catch (err) {
     console.error('[Attendance] POST /', err.message);

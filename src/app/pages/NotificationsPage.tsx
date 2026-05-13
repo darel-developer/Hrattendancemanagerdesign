@@ -46,7 +46,7 @@ export function NotificationsPage() {
       }).catch(console.error);
     };
     fetchNotifs();
-    const interval = setInterval(fetchNotifs, 30000);
+    const interval = setInterval(fetchNotifs, 20000);
     return () => clearInterval(interval);
   }, [currentUser?.companyId, currentUser?.id]);
 

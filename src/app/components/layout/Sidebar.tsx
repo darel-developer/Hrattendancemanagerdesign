@@ -77,7 +77,7 @@ export function Sidebar() {
       } catch {}
     };
     fetchCounts();
-    const interval = setInterval(fetchCounts, 30000);
+    const interval = setInterval(fetchCounts, 20000);
     return () => clearInterval(interval);
   }, [currentUser?.id]);
 

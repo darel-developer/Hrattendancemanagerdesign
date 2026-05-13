@@ -25,6 +25,7 @@ export interface Employee {
   leaveBalance: number;
   leaveUsed: number;
   pin?: string | null;
+  workDays?: string[];
 }
 
 export interface Company {

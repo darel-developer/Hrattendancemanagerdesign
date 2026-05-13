@@ -7,40 +7,13 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { notificationsApi } from "../../services/api";
 import { Notification } from "../../data/mockData";
-
-const pageTitles: Record<string, { title: string; subtitle: string }> = {
-  "/dashboard": { title: "Tableau de bord", subtitle: "Vue d'ensemble de votre organisation" },
-  "/employees": { title: "Employés", subtitle: "Gestion de vos collaborateurs" },
-  "/attendance": { title: "Présences", subtitle: "Suivi des pointages quotidiens" },
-  "/leaves": { title: "Congés", subtitle: "Gestion des demandes de congé" },
-  "/reports": { title: "Rapports", subtitle: "Statistiques et analyses" },
-  "/notifications": { title: "Notifications", subtitle: "Alertes et rappels" },
-  "/settings": { title: "Paramètres", subtitle: "Configuration de la plateforme" },
-};
-
-const roleSubtitles: Record<string, Record<string, string>> = {
-  "/dashboard": {
-    Admin: "Vue globale de l'organisation",
-    Manager: "Vue de votre département",
-    Employee: "Votre espace personnel",
-  },
-  "/attendance": {
-    Admin: "Tous les pointages",
-    Manager: "Pointages de votre équipe",
-    Employee: "Mon pointage du jour",
-  },
-  "/leaves": {
-    Admin: "Toutes les demandes de congé",
-    Manager: "Congés de votre équipe",
-    Employee: "Mes demandes de congé",
-  },
-};
+import { translations } from "../../data/translations";
 
 export function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, employees } = useAuth();
-  const { toggleTheme, isDark } = useTheme();
+  const { toggleTheme, isDark, language } = useTheme();
   const { setMobileOpen } = useLayout();
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [searchVal, setSearchVal] = useState("");
@@ -53,13 +26,24 @@ export function Header() {
       notificationsApi.getAll(currentUser?.companyId ?? undefined).then(setNotifications).catch(() => {});
     };
     fetchNotifs();
-    const interval = setInterval(fetchNotifs, 30000);
+    const interval = setInterval(fetchNotifs, 20000);
     return () => clearInterval(interval);
   }, [currentUser?.id]);
 
   const role = currentUser?.role ?? "Employee";
-  const pageInfo = pageTitles[location.pathname] ?? { title: "HR Manager", subtitle: "" };
-  const roleSubtitle = roleSubtitles[location.pathname]?.[role] ?? pageInfo.subtitle;
+
+  const tr = translations[language] as Record<string, string>;
+  const pathBase = "/" + (location.pathname.split("/")[1] ?? "");
+  const pageKeyMap: Record<string, string> = {
+    "/dashboard": "dashboard", "/employees": "employees", "/attendance": "attendance",
+    "/calendar": "calendar", "/leaves": "leaves", "/reports": "reports",
+    "/notifications": "notifications", "/settings": "settings", "/performance": "performance",
+    "/documents": "documents", "/planning": "planning", "/departments": "departments",
+  };
+  const pageKey = pageKeyMap[pathBase];
+  const pageTitle = (pageKey && tr[`page.${pageKey}.title`]) || "HR Manager";
+  const roleSuffix = role === "Admin" ? "admin" : role === "Manager" ? "manager" : "employee";
+  const finalSubtitle = (pageKey && (tr[`page.${pageKey}.subtitle.${roleSuffix}`] || tr[`page.${pageKey}.subtitle`])) || "";
 
   // Filter notifications for current user
   const userNotifs = notifications.filter((n) =>
@@ -77,7 +61,8 @@ export function Header() {
     : [];
 
   const today = new Date();
-  const dateStr = today.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const dateLocale = language === "en" ? "en-US" : "fr-FR";
+  const dateStr = today.toLocaleDateString(dateLocale, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 
   return (
@@ -94,10 +79,10 @@ export function Header() {
         </button>
         <div className="min-w-0">
           <h1 className="truncate" style={{ fontWeight: 700, fontSize: "1.125rem", color: "var(--hr-text)" }}>
-            {pageInfo.title}
+            {pageTitle}
           </h1>
           <p className="text-xs hidden sm:block truncate" style={{ color: "var(--hr-text-light)" }}>
-            {roleSubtitle} · {capitalizedDate}
+            {finalSubtitle} · {capitalizedDate}
           </p>
         </div>
       </div>

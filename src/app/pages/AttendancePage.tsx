@@ -16,12 +16,23 @@ const statusConfig: Record<string, { bg: string; text: string; icon: React.React
   "Télétravail": { bg: "#CCFBF1", text: "#0D9488", icon: <MonitorSmartphone size={13} />, label: "Télétravail" },
 };
 
+function computeCheckInStatus(
+  checkInTime: string,
+  workStart: string,
+  lateTolerance: number
+): "Présent" | "Retard" {
+  const [wh, wm] = workStart.split(":").map(Number);
+  const [ch, cm] = checkInTime.split(":").map(Number);
+  return ch * 60 + cm > wh * 60 + wm + lateTolerance ? "Retard" : "Présent";
+}
+
 // ─── Employee Personal Check-In Widget ──────────────────────────────────────
 function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
   employeeId: string;
   todayRecord?: AttendanceRecord;
   onRefresh?: () => void;
 }) {
+  const { currentCompany } = useAuth();
   const [time, setTime] = useState(new Date());
   const [checkInState, setCheckInState] = useState<"none" | "in" | "out">("none");
   const [checkInTime, setCheckInTime] = useState<string>("");
@@ -64,7 +75,11 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
     }
     const today = new Date().toISOString().split("T")[0];
     const recordedTime = showManualEntry && manualTime ? manualTime : formatTime(time);
-    const status = workMode === "télétravail" ? "Télétravail" : "Présent";
+    const status = workMode === "télétravail"
+      ? "Télétravail"
+      : currentCompany
+        ? computeCheckInStatus(recordedTime, currentCompany.workStart ?? "09:00", currentCompany.lateTolerance ?? 5)
+        : "Présent";
     try {
       const created = await attendanceApi.create({
         employeeId,
@@ -350,8 +365,8 @@ export function AttendancePage() {
       }
     };
     fetch();
-    // Polling 10s pour Admin/Manager (pointages kiosk en temps réel), 30s pour Employee
-    const interval = role === "Employee" ? 30000 : 10000;
+    // Polling 8s pour Admin/Manager (pointages kiosk en temps réel), 20s pour Employee
+    const interval = role === "Employee" ? 20000 : 8000;
     const t = setInterval(fetch, interval);
     return () => clearInterval(t);
   }, [role, selectedDate, currentUser?.id]);

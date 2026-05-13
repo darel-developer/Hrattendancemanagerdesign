@@ -264,7 +264,7 @@ export function LeavesPage() {
       leavesApi.getAll({ companyId: currentUser?.companyId ?? undefined }).then(setLeaves).catch(console.error);
     };
     fetchLeaves();
-    const interval = setInterval(fetchLeaves, 30000);
+    const interval = setInterval(fetchLeaves, 20000);
     return () => clearInterval(interval);
   }, [currentUser?.companyId]);
 
