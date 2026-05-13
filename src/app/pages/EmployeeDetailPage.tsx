@@ -91,95 +91,88 @@ export function EmployeeDetailPage() {
         className="rounded-2xl overflow-hidden"
         style={{ background: "white", border: "1px solid #F1F3F9", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
       >
-        {/* Banner */}
-        <div
-          className="h-28 relative"
-          style={{ background: "linear-gradient(135deg, #0B1437 0%, #312E81 100%)" }}
-        >
-          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 70% 50%, #6366F1, transparent)" }} />
+        {/* Banner + avatar zone */}
+        <div className="relative" style={{ paddingBottom: "3.5rem" }}>
+          {/* Banner */}
+          <div
+            className="h-28"
+            style={{ background: "linear-gradient(135deg, #0B1437 0%, #312E81 100%)" }}
+          >
+            <div className="absolute inset-x-0 top-0 h-28 opacity-10"
+              style={{ backgroundImage: "radial-gradient(circle at 70% 50%, #6366F1, transparent)" }} />
+          </div>
+
+          {/* Avatar — positionné en absolu sur la ligne de séparation bannière/contenu */}
+          <div className="absolute left-4 md:left-6" style={{ bottom: 0 }}>
+            <img
+              src={emp.avatar}
+              alt={emp.firstName}
+              className="w-20 h-20 rounded-2xl object-cover"
+              style={{ border: "4px solid white", boxShadow: "0 4px 16px rgba(0,0,0,0.18)" }}
+            />
+          </div>
+
+          {/* Boutons en haut à droite dans la zone bannière */}
+          <div className="absolute right-4 md:right-6 bottom-2 flex gap-2">
+            <button
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-all hover:bg-slate-100"
+              style={{ background: "white", border: "1.5px solid #E5E7EB", color: "#374151", fontWeight: 600 }}
+            >
+              <Download size={14} />
+              Exporter
+            </button>
+            <button
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm transition-all hover:opacity-90"
+              style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
+            >
+              <Edit2 size={14} />
+              Modifier
+            </button>
+          </div>
         </div>
 
-        {/* Info */}
-        <div className="px-3 md:px-6 pb-6">
-          <div className="flex items-end justify-between -mt-12 mb-4 flex-wrap gap-4">
-            <div className="flex items-end gap-4">
-              <img
-                src={emp.avatar}
-                alt={emp.firstName}
-                className="w-24 h-24 rounded-2xl object-cover"
-                style={{ border: "4px solid white", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
-              />
-              <div className="pb-2">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-slate-800" style={{ fontWeight: 800, fontSize: "1.3rem" }}>
-                    {emp.firstName} {emp.lastName}
-                  </h1>
-                  <span
-                    className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-                    style={{
-                      background: emp.status === "Actif" ? "#D1FAE5" : emp.status === "Inactif" ? "#F3F4F6" : "#EDE9FE",
-                      color: emp.status === "Actif" ? "#16A34A" : emp.status === "Inactif" ? "#6B7280" : "#7C3AED",
-                      fontWeight: 700,
-                    }}
-                  >
-                    <div
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{
-                        background: emp.status === "Actif" ? "#16A34A" : emp.status === "Inactif" ? "#6B7280" : "#7C3AED",
-                      }}
-                    />
-                    {emp.status}
-                  </span>
-                </div>
-                <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>
-                  {emp.position} · {emp.department}
-                </p>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <Shield size={12} style={{ color: "#8B5CF6" }} />
-                  <p className="text-xs" style={{ color: "#8B5CF6", fontWeight: 600 }}>
-                    {emp.role}
-                  </p>
-                </div>
+        {/* Info texte — commence après l'avatar */}
+        <div className="px-4 md:px-6 pt-3 pb-6">
+          <div className="flex items-start justify-between flex-wrap gap-2 mb-5">
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 style={{ fontWeight: 800, fontSize: "1.25rem", color: "#0F172A" }}>
+                  {emp.firstName} {emp.lastName}
+                </h1>
+                <span
+                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                  style={{
+                    background: emp.status === "Actif" ? "#D1FAE5" : emp.status === "Inactif" ? "#F3F4F6" : "#EDE9FE",
+                    color: emp.status === "Actif" ? "#16A34A" : emp.status === "Inactif" ? "#6B7280" : "#7C3AED",
+                    fontWeight: 700,
+                  }}
+                >
+                  <div className="w-1.5 h-1.5 rounded-full"
+                    style={{ background: emp.status === "Actif" ? "#16A34A" : emp.status === "Inactif" ? "#6B7280" : "#7C3AED" }} />
+                  {emp.status}
+                </span>
               </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-all hover:bg-slate-100"
-                style={{ border: "1.5px solid #E5E7EB", color: "#374151", fontWeight: 600 }}
-              >
-                <Download size={14} />
-                Exporter
-              </button>
-              <button
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm transition-all hover:opacity-90"
-                style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
-              >
-                <Edit2 size={14} />
-                Modifier
-              </button>
+              <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>
+                {emp.position} · {emp.department}
+              </p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <Shield size={12} style={{ color: "#8B5CF6" }} />
+                <p className="text-xs" style={{ color: "#8B5CF6", fontWeight: 600 }}>{emp.role}</p>
+              </div>
             </div>
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Ancienneté", value: emp.startDate ? `${new Date().getFullYear() - new Date(emp.startDate).getFullYear()} ans` : "—", color: "#6366F1", bg: "#EDE9FE" },
               { label: "Salaire", value: `${(emp.salary ?? 0).toLocaleString("fr-FR")} FCFA`, color: "#10B981", bg: "#D1FAE5" },
               { label: "Congés restants", value: `${leaveRemaining} jours`, color: "#F59E0B", bg: "#FEF3C7" },
               { label: "Congés utilisés", value: `${emp.leaveUsed} jours`, color: "#8B5CF6", bg: "#F5F3FF" },
             ].map((s) => (
-              <div
-                key={s.label}
-                className="rounded-xl p-3 text-center"
-                style={{ background: s.bg }}
-              >
-                <p className="text-lg" style={{ fontWeight: 800, color: s.color }}>
-                  {s.value}
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: "#6B7280" }}>
-                  {s.label}
-                </p>
+              <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: s.bg }}>
+                <p className="text-lg" style={{ fontWeight: 800, color: s.color }}>{s.value}</p>
+                <p className="text-xs mt-0.5" style={{ color: "#6B7280" }}>{s.label}</p>
               </div>
             ))}
           </div>
