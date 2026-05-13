@@ -1,10 +1,19 @@
+'use strict';
+
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
 const db = require('../db');
+const { requireAuth, requireRole, checkCompany } = require('../middleware/auth');
 
-function sha256(str) {
-  return crypto.createHash('sha256').update(str).digest('hex');
+// Chargement optionnel de bcrypt (fallback SHA-256 si absent)
+let bcrypt = null;
+try { bcrypt = require('bcrypt'); } catch { /* bcrypt non disponible */ }
+
+const crypto = require('crypto');
+function sha256(str) { return crypto.createHash('sha256').update(str).digest('hex'); }
+async function hashPassword(plain) {
+  if (bcrypt) return bcrypt.hash(plain, 12);
+  return sha256(plain);
 }
 
 function mapEmployee(row) {
@@ -23,16 +32,15 @@ function mapEmployee(row) {
     startDate: row.start_date || null,
     salary: row.salary !== null ? parseFloat(row.salary) : null,
     status: row.status,
-    manager: row.manager_id || null,
+    managerId: row.manager_id || null,   // ← corrigé: était "manager"
     address: row.address,
     birthDate: row.birth_date || null,
     leaveBalance: row.leave_balance,
     leaveUsed: row.leave_used,
-    // PIN intentionnellement exclu des réponses API
+    // password_hash et pin intentionnellement exclus
   };
 }
 
-// Valeurs acceptées pour les champs enum
 const VALID_ROLES = ['Admin', 'Manager', 'Employee'];
 const VALID_CONTRACTS = ['CDI', 'CDD', 'Stage', 'Freelance'];
 const VALID_STATUSES = ['Actif', 'Inactif', 'En congé'];
@@ -52,7 +60,8 @@ function validateEmployee(e) {
   return null;
 }
 
-router.get('/', async (req, res) => {
+// ─── GET /employees ──────────────────────────────────────────────────────────
+router.get('/', requireAuth, checkCompany, async (req, res) => {
   try {
     const { companyId, role } = req.query;
     const conditions = [];
@@ -62,30 +71,40 @@ router.get('/', async (req, res) => {
     const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
     const [rows] = await db.query(`SELECT * FROM employees${where} ORDER BY id`, params);
     res.json(rows.map(mapEmployee));
-  } catch {
+  } catch (err) {
+    console.error('[Employees] GET /', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-router.get('/:id', async (req, res) => {
+// ─── GET /employees/:id ──────────────────────────────────────────────────────
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM employees WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Employé non trouvé' });
-    res.json(mapEmployee(rows[0]));
-  } catch {
+    // Un employé ne peut voir que son propre profil, sauf Admin/Manager
+    const emp = rows[0];
+    if (req.user.role === 'Employee' && emp.id !== req.user.id && emp.company_id !== req.user.companyId) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    res.json(mapEmployee(emp));
+  } catch (err) {
+    console.error('[Employees] GET /:id', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-router.post('/', async (req, res) => {
+// ─── POST /employees ─────────────────────────────────────────────────────────
+router.post('/', requireAuth, requireRole('Admin'), async (req, res) => {
   try {
     const e = req.body;
     const err = validateEmployee(e);
     if (err) return res.status(400).json({ error: err });
 
-    const passwordHash = e.password ? sha256(e.password) : null;
-    // PIN requis pour le kiosque — pas de valeur par défaut
+    const passwordHash = e.password ? await hashPassword(e.password) : null;
     const pin = e.pin ? String(e.pin) : null;
+    // Forcer le companyId depuis le token pour éviter les injections cross-tenant
+    const companyId = req.user.companyId;
 
     await db.query(
       `INSERT INTO employees
@@ -94,10 +113,11 @@ router.post('/', async (req, res) => {
          leave_balance, leave_used, password_hash, pin)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        e.id, e.companyId || 'COMP001',
+        e.id, companyId,
         e.firstName, e.lastName, e.email, e.phone || '', e.avatar || '',
         e.role, e.department, e.position, e.contractType,
-        e.startDate || null, e.salary || null, e.status, e.manager || null,
+        e.startDate || null, e.salary || null, e.status,
+        e.managerId || e.manager || null,
         e.address || '', e.birthDate || null, e.leaveBalance ?? 25, e.leaveUsed ?? 0,
         passwordHash, pin,
       ]
@@ -106,12 +126,20 @@ router.post('/', async (req, res) => {
     res.status(201).json(mapEmployee(rows[0]));
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Email ou ID déjà utilisé' });
+    console.error('[Employees] POST /', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-router.put('/:id', async (req, res) => {
+// ─── PUT /employees/:id ──────────────────────────────────────────────────────
+router.put('/:id', requireAuth, async (req, res) => {
   try {
+    // Seuls les Admins peuvent modifier n'importe quel employé
+    // Un employé peut modifier uniquement son propre profil (sans changer son rôle)
+    if (req.user.role !== 'Admin' && req.params.id !== req.user.id) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
     const e = req.body;
     const valErr = validateEmployee(e);
     if (valErr) return res.status(400).json({ error: valErr });
@@ -125,7 +153,8 @@ router.put('/:id', async (req, res) => {
       [
         e.firstName, e.lastName, e.email, e.phone || '', e.avatar || '',
         e.role, e.department, e.position, e.contractType,
-        e.startDate || null, e.salary || null, e.status, e.manager || null,
+        e.startDate || null, e.salary || null, e.status,
+        e.managerId || e.manager || null,
         e.address || '', e.birthDate || null, e.leaveBalance ?? 25, e.leaveUsed ?? 0,
         e.pin ? String(e.pin) : null,
         req.params.id,
@@ -133,7 +162,8 @@ router.put('/:id', async (req, res) => {
     );
 
     if (e.password) {
-      await db.query('UPDATE employees SET password_hash = ? WHERE id = ?', [sha256(e.password), req.params.id]);
+      const hash = await hashPassword(e.password);
+      await db.query('UPDATE employees SET password_hash = ? WHERE id = ?', [hash, req.params.id]);
     }
 
     const [rows] = await db.query('SELECT * FROM employees WHERE id = ?', [req.params.id]);
@@ -141,15 +171,22 @@ router.put('/:id', async (req, res) => {
     res.json(mapEmployee(rows[0]));
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Email déjà utilisé' });
+    console.error('[Employees] PUT /:id', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-router.delete('/:id', async (req, res) => {
+// ─── DELETE /employees/:id ───────────────────────────────────────────────────
+router.delete('/:id', requireAuth, requireRole('Admin'), async (req, res) => {
   try {
-    await db.query('DELETE FROM employees WHERE id = ?', [req.params.id]);
+    // Empêche la suppression d'un Admin par lui-même
+    if (req.params.id === req.user.id) {
+      return res.status(400).json({ error: 'Impossible de supprimer votre propre compte' });
+    }
+    await db.query('DELETE FROM employees WHERE id = ? AND company_id = ?', [req.params.id, req.user.companyId]);
     res.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('[Employees] DELETE /:id', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

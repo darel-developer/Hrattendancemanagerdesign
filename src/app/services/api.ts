@@ -12,11 +12,27 @@ import type {
 
 const API_BASE = "/api";
 
+let _authToken: string | null = null;
+
+export function setAuthToken(token: string | null): void {
+  _authToken = token;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (_authToken) headers["Authorization"] = `Bearer ${_authToken}`;
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers: { ...headers, ...(options?.headers as Record<string, string> | undefined) },
   });
+
+  if (res.status === 401) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    window.dispatchEvent(new CustomEvent("auth:expired", { detail: body }));
+    throw new Error(body.error || "Session expirée");
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || res.statusText);
@@ -174,7 +190,7 @@ export const departmentsApi = {
 // ─── Auth ─────────────────────────────────────────────────────
 export const authApi = {
   login: (email: string, password: string) =>
-    request<Employee>("/auth/login", {
+    request<{ token: string; user: Employee }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),

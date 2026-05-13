@@ -1,6 +1,6 @@
 // ─── Types & Interfaces ───────────────────────────────────────────────────────
 export type Role = "Admin" | "Manager" | "Employee";
-export type Department = "Ingénierie" | "RH" | "Marketing" | "Finance" | "Direction" | "Design";
+export type Department = string;
 export type ContractType = "CDI" | "CDD" | "Stage" | "Freelance";
 export type EmployeeStatus = "Actif" | "Inactif" | "En congé";
 
@@ -19,7 +19,7 @@ export interface Employee {
   startDate: string;
   salary: number;
   status: EmployeeStatus;
-  manager: string | null;
+  managerId: string | null;
   address: string;
   birthDate: string;
   leaveBalance: number;
@@ -82,7 +82,7 @@ export interface Notification {
   title: string;
   message: string;
   date: string;
-  read: boolean;
+  isRead: boolean;
   employeeId: string | null;
 }
 

@@ -31,14 +31,21 @@ app.use(securityHeaders);
 // ─── CORS — origines autorisées uniquement ────────────────────────────────────
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5174')
   .split(',').map((o) => o.trim());
-app.use(cors({
-  origin: (origin, cb) => {
-    // Autoriser les requêtes sans origin (ex: outils CLI, tests)
+
+const corsOptions = {
+  origin(origin, cb) {
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error('Origine non autorisée'));
+    cb(new Error(`Origine non autorisée: ${origin}`));
   },
   credentials: true,
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  optionsSuccessStatus: 200,
+};
+
+// Preflight pour toutes les routes (doit être avant app.use(cors))
+app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
 
 // ─── Parsing JSON — limite augmentée pour les avatars base64 ─────────────────
 app.use(express.json({ limit: '5mb' }));
@@ -198,6 +205,9 @@ function scheduleAutoNotifications() {
 
 // ─── Startup ───────────────────────────────────────────────────────────────────
 app.listen(PORT, async () => {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'CHANGE_ME_IN_PRODUCTION') {
+    console.warn('[SECURITY] JWT_SECRET non défini — utilisez une valeur sécurisée en production !');
+  }
   console.log(`Serveur HR démarré sur http://localhost:${PORT}`);
   try {
     await ensureReportsTable();

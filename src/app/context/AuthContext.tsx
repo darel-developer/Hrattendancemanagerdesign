@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { Employee, Company } from "../data/mockData";
-import { employeesApi, authApi, companiesApi } from "../services/api";
+import { employeesApi, authApi, companiesApi, setAuthToken } from "../services/api";
 
 interface AuthContextType {
   currentUser: Employee | null;
@@ -19,6 +19,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const SESSION_KEY = "hr_session";
+const TOKEN_KEY = "hr_token";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -26,9 +27,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Restore session from localStorage on mount
   useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY);
     const saved = localStorage.getItem(SESSION_KEY);
-    if (saved) {
+    if (token && saved) {
+      setAuthToken(token);
       try {
         const { userId, companyId } = JSON.parse(saved);
         Promise.all([
@@ -40,10 +44,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setCurrentCompany(company);
             setCurrentUser(emps.find((e) => e.id === userId) ?? null);
           })
-          .catch(() => localStorage.removeItem(SESSION_KEY))
+          .catch(() => {
+            localStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(TOKEN_KEY);
+            setAuthToken(null);
+          })
           .finally(() => setLoading(false));
       } catch {
         localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(TOKEN_KEY);
+        setAuthToken(null);
         setLoading(false);
       }
     } else {
@@ -51,9 +61,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Listen for session expiry dispatched by api.ts on 401
+  useEffect(() => {
+    const handleExpired = () => logout();
+    window.addEventListener("auth:expired", handleExpired);
+    return () => window.removeEventListener("auth:expired", handleExpired);
+  }, []);
+
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const user = await authApi.login(email, password);
+      const { token, user } = await authApi.login(email, password);
+      setAuthToken(token);
+      localStorage.setItem(TOKEN_KEY, token);
       const companyId = user.companyId!;
       const [emps, company] = await Promise.all([
         employeesApi.getAll({ companyId }),
@@ -73,7 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrentUser(null);
     setEmployees([]);
     setCurrentCompany(null);
+    setAuthToken(null);
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(TOKEN_KEY);
   };
 
   const addEmployee = async (emp: Employee & { password?: string; pin?: string }): Promise<void> => {

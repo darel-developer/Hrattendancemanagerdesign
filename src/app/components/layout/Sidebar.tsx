@@ -65,7 +65,7 @@ export function Sidebar() {
           currentUser.role === "Admin" || currentUser.role === "Manager" ||
           n.employeeId === currentUser.id || n.employeeId === null
         );
-        const unread = userNotifs.filter((n) => !n.read).length;
+        const unread = userNotifs.filter((n) => !n.isRead).length;
         let pendingLeaves = 0;
         if (currentUser.role === "Admin") {
           pendingLeaves = leaves.filter((l) => l.status === "En attente").length;

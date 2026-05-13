@@ -65,7 +65,7 @@ export function Header() {
   const userNotifs = notifications.filter((n) =>
     role === "Admin" || role === "Manager" || n.employeeId === currentUser?.id || n.employeeId === null
   );
-  const unreadCount = userNotifs.filter((n) => !n.read).length;
+  const unreadCount = userNotifs.filter((n) => !n.isRead).length;
 
   // Search results
   const searchResults = searchVal.trim().length >= 2
@@ -203,10 +203,10 @@ export function Header() {
                         className="flex items-start gap-3 px-4 py-3 border-b cursor-pointer transition-colors"
                         style={{
                           borderColor: "var(--hr-card-border)",
-                          background: n.read ? "transparent" : "rgba(99,102,241,0.05)",
+                          background: n.isRead ? "transparent" : "rgba(99,102,241,0.05)",
                         }}>
                         <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                          style={{ background: n.read ? "var(--hr-text-light)" : "#6366F1" }} />
+                          style={{ background: n.isRead ? "var(--hr-text-light)" : "#6366F1" }} />
                         <div>
                           <p className="text-xs" style={{ fontWeight: 600, color: "var(--hr-text)" }}>{n.title}</p>
                           <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-muted)" }}>{n.message}</p>

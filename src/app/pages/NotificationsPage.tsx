@@ -52,19 +52,19 @@ export function NotificationsPage() {
 
   const filtered = notifs.filter((n) => {
     if (filter === "Tous") return true;
-    if (filter === "Non lus") return !n.read;
+    if (filter === "Non lus") return !n.isRead;
     return n.type === filter;
   });
 
-  const unreadCount = notifs.filter((n) => !n.read).length;
+  const unreadCount = notifs.filter((n) => !n.isRead).length;
 
   const markAllRead = async () => {
     await notificationsApi.markAllRead(currentUser?.companyId ?? undefined).catch(console.error);
-    setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifs((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
   const markRead = async (id: string) => {
     await notificationsApi.markRead(id).catch(console.error);
-    setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
   };
   const deleteNotif = async (id: string) => {
     await notificationsApi.deleteOne(id).catch(console.error);
@@ -180,10 +180,10 @@ export function NotificationsPage() {
                   transition={{ delay: i * 0.04 }}
                   className="flex items-start gap-4 p-4 rounded-2xl cursor-pointer group"
                   style={{
-                    background: n.read ? "white" : "rgba(99,102,241,0.03)",
+                    background: n.isRead ? "white" : "rgba(99,102,241,0.03)",
                     border: "1.5px solid",
-                    borderColor: n.read ? "#F1F3F9" : "rgba(99,102,241,0.15)",
-                    boxShadow: n.read ? "0 1px 4px rgba(0,0,0,0.03)" : "0 2px 8px rgba(99,102,241,0.08)",
+                    borderColor: n.isRead ? "#F1F3F9" : "rgba(99,102,241,0.15)",
+                    boxShadow: n.isRead ? "0 1px 4px rgba(0,0,0,0.03)" : "0 2px 8px rgba(99,102,241,0.08)",
                   }}
                   onClick={() => markRead(n.id)}
                 >
@@ -200,7 +200,7 @@ export function NotificationsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm" style={{ fontWeight: n.read ? 500 : 700, color: "#111827" }}>
+                          <p className="text-sm" style={{ fontWeight: n.isRead ? 500 : 700, color: "#111827" }}>
                             {n.title}
                           </p>
                           <span
@@ -209,7 +209,7 @@ export function NotificationsPage() {
                           >
                             {cfg.label}
                           </span>
-                          {!n.read && (
+                          {!n.isRead && (
                             <div className="w-2 h-2 rounded-full" style={{ background: "#6366F1" }} />
                           )}
                         </div>

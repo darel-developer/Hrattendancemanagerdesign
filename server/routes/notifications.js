@@ -10,7 +10,7 @@ function mapNotif(row) {
     title: row.title,
     message: row.message,
     date: dateStr,
-    read: row.is_read === 1 || row.is_read === true || row.is_read === '1',
+    isRead: row.is_read === 1 || row.is_read === true || row.is_read === '1',
     employeeId: row.employee_id || null,
   };
 }

@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { Layout } from "./components/layout/Layout";
+import { RequireRole } from "./components/RequireRole";
 import { LoginPage } from "./pages/LoginPage";
 import { KioskPage } from "./pages/KioskPage";
 import { SuperAdminPage } from "./pages/SuperAdminPage";
@@ -36,8 +37,14 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", Component: DashboardPage },
-      { path: "employees", Component: EmployeesPage },
-      { path: "employees/:id", Component: EmployeeDetailPage },
+      {
+        path: "employees",
+        element: <RequireRole roles={["Admin", "Manager"]}><EmployeesPage /></RequireRole>,
+      },
+      {
+        path: "employees/:id",
+        element: <RequireRole roles={["Admin", "Manager", "Employee"]}><EmployeeDetailPage /></RequireRole>,
+      },
       { path: "attendance", Component: AttendancePage },
       { path: "calendar", Component: CalendarPage },
       { path: "leaves", Component: LeavesPage },
@@ -46,8 +53,14 @@ export const router = createBrowserRouter([
       { path: "settings", Component: SettingsPage },
       { path: "performance", Component: PerformancePage },
       { path: "documents", Component: DocumentsPage },
-      { path: "planning", Component: PlanningPage },
-      { path: "departments", Component: DepartmentsPage },
+      {
+        path: "planning",
+        element: <RequireRole roles={["Admin", "Manager"]}><PlanningPage /></RequireRole>,
+      },
+      {
+        path: "departments",
+        element: <RequireRole roles={["Admin"]}><DepartmentsPage /></RequireRole>,
+      },
     ],
   },
   {

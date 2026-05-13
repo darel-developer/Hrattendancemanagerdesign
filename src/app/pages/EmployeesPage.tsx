@@ -776,7 +776,7 @@ function EditEmployeeModal({ emp, onClose, onSave, allEmployees, departments, on
     contractType: emp.contractType as any, role: emp.role as any,
     startDate: emp.startDate || "", birthDate: emp.birthDate || "",
     salary: emp.salary != null ? String(emp.salary) : "",
-    managerId: emp.manager || "", address: emp.address || "",
+    managerId: emp.managerId || "", address: emp.address || "",
     status: emp.status as any, password: "",
   });
   const [error, setError] = useState("");

@@ -800,7 +800,7 @@ export function ReportsPage() {
 
   // ─── Employee view ────────────────────────────────────────────────────────
   if (role === "Employee") {
-    const myManager = allEmployees.find((e) => e.id === currentUser?.manager);
+    const myManager = allEmployees.find((e) => e.id === currentUser?.managerId);
     const refreshReports = () => {
       if (!currentUser?.id) return;
       reportsApi.getReceived(currentUser.id).then(setReceivedReports).catch(console.error);
