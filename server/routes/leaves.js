@@ -113,7 +113,12 @@ router.put('/:id', requireAuth, async (req, res) => {
           'UPDATE employees SET leave_used = leave_used + ? WHERE id = ?',
           [leave.days, leave.employee_id]
         );
+        console.info(`[Leaves] Approbation — employé ${leave.employee_id}, ${leave.days} jour(s) déduits`);
       }
+    }
+
+    if (l.status === 'Refusé') {
+      console.info(`[Leaves] Refus — demande ${req.params.id} par ${req.user?.id}`);
     }
 
     await db.query(

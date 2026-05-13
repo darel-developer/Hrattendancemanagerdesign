@@ -213,7 +213,11 @@ export function PlanningPage() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [monday.toISOString()]);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 20000);
+    return () => clearInterval(t);
+  }, [monday.toISOString()]);
 
   const getShift = (empId: string, date: string) =>
     shifts.find((s) => s.employeeId === empId && s.date === date);

@@ -755,7 +755,11 @@ export function ReportsPage() {
   useEffect(() => {
     leavesApi.getAll().then(setAllLeaves).catch(console.error);
     attendanceApi.getAll().then(setAttendanceRecords).catch(console.error);
-    if (currentUser?.id) {
+  }, [currentUser?.companyId]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const fetchReports = () => {
       reportsApi.getReceived(currentUser.id).then(async (reports) => {
         const fiveDaysAgo = Date.now() - 5 * 24 * 60 * 60 * 1000;
         const toDelete = reports.filter(
@@ -765,7 +769,10 @@ export function ReportsPage() {
         setReceivedReports(reports.filter((r) => !toDelete.some((d) => d.id === r.id)));
       }).catch(console.error);
       reportsApi.getSent(currentUser.id).then(setSentReports).catch(console.error);
-    }
+    };
+    fetchReports();
+    const t = setInterval(fetchReports, 30000);
+    return () => clearInterval(t);
   }, [currentUser?.id]);
 
   const deptEmpIds = useMemo(() => {

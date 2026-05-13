@@ -336,17 +336,24 @@ export function AttendancePage() {
 
   useEffect(() => {
     if (!currentUser) return;
-    if (role === "Employee") {
-      attendanceApi.getAll({ employeeId: currentUser.id }).then(setAttendanceRecords).catch(console.error);
-    } else {
-      attendanceApi.getAll({ date: selectedDate }).then(setAttendanceRecords).catch(console.error);
-      if (role === "Manager") {
-        const today = new Date().toISOString().split("T")[0];
-        attendanceApi.getAll({ employeeId: currentUser.id, date: today })
-          .then((records) => setMyTodayRecord(records[0]))
-          .catch(console.error);
+    const fetch = () => {
+      if (role === "Employee") {
+        attendanceApi.getAll({ employeeId: currentUser.id }).then(setAttendanceRecords).catch(console.error);
+      } else {
+        attendanceApi.getAll({ date: selectedDate }).then(setAttendanceRecords).catch(console.error);
+        if (role === "Manager") {
+          const today = new Date().toISOString().split("T")[0];
+          attendanceApi.getAll({ employeeId: currentUser.id, date: today })
+            .then((records) => setMyTodayRecord(records[0]))
+            .catch(console.error);
+        }
       }
-    }
+    };
+    fetch();
+    // Polling 10s pour Admin/Manager (pointages kiosk en temps réel), 30s pour Employee
+    const interval = role === "Employee" ? 30000 : 10000;
+    const t = setInterval(fetch, interval);
+    return () => clearInterval(t);
   }, [role, selectedDate, currentUser?.id]);
 
   const navigateDate = (dir: "prev" | "next") => {

@@ -1,6 +1,8 @@
+'use strict';
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth } = require('../middleware/auth');
 
 function mapRecord(row) {
   return {
@@ -15,24 +17,25 @@ function mapRecord(row) {
   };
 }
 
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const { date, employeeId, startDate, endDate } = req.query;
     let query = 'SELECT * FROM attendance_records WHERE 1=1';
     const params = [];
-    if (date) { query += ' AND date = ?'; params.push(date); }
-    if (startDate) { query += ' AND date >= ?'; params.push(startDate); }
-    if (endDate) { query += ' AND date <= ?'; params.push(endDate); }
+    if (date)       { query += ' AND date = ?';        params.push(date); }
+    if (startDate)  { query += ' AND date >= ?';       params.push(startDate); }
+    if (endDate)    { query += ' AND date <= ?';       params.push(endDate); }
     if (employeeId) { query += ' AND employee_id = ?'; params.push(employeeId); }
     query += ' ORDER BY date DESC, id';
     const [rows] = await db.query(query, params);
     res.json(rows.map(mapRecord));
-  } catch {
+  } catch (err) {
+    console.error('[Attendance] GET /', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const r = req.body;
     const id = r.id || `ATT${Date.now()}`;
@@ -47,13 +50,16 @@ router.post('/', async (req, res) => {
        r.status, r.hoursWorked ?? null, r.note || '']
     );
     const [rows] = await db.query('SELECT * FROM attendance_records WHERE id = ?', [id]);
+    const action = r.checkIn && !r.checkOut ? 'check-in' : r.checkOut ? 'check-out' : 'enregistrement';
+    console.info(`[Attendance] ${action} — employé ${r.employeeId} le ${r.date}`);
     res.status(201).json(mapRecord(rows[0]));
-  } catch {
+  } catch (err) {
+    console.error('[Attendance] POST /', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const r = req.body;
     await db.query(
@@ -65,8 +71,10 @@ router.put('/:id', async (req, res) => {
     );
     const [rows] = await db.query('SELECT * FROM attendance_records WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Enregistrement non trouvé' });
+    if (r.checkOut) console.info(`[Attendance] check-out — record ${req.params.id} à ${r.checkOut}`);
     res.json(mapRecord(rows[0]));
-  } catch {
+  } catch (err) {
+    console.error('[Attendance] PUT /:id', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

@@ -25,6 +25,30 @@ const db = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// ─── Logger centralisé ────────────────────────────────────────────────────────
+const LOG_LEVEL = process.env.LOG_LEVEL || 'info'; // 'debug' | 'info' | 'warn' | 'error'
+function ts() { return new Date().toISOString(); }
+const logger = {
+  debug: (...a) => LOG_LEVEL === 'debug' && console.debug(`[${ts()}] [DEBUG]`, ...a),
+  info:  (...a) => ['debug','info'].includes(LOG_LEVEL) && console.info(`[${ts()}] [INFO] `, ...a),
+  warn:  (...a) => console.warn(`[${ts()}] [WARN] `, ...a),
+  error: (...a) => console.error(`[${ts()}] [ERROR]`, ...a),
+};
+module.exports.logger = logger;
+
+// ─── Middleware de logging des requêtes HTTP ──────────────────────────────────
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    const msg = `${req.method} ${req.originalUrl} → ${res.statusCode} (${ms}ms)`;
+    if (res.statusCode >= 500) logger.error(msg);
+    else if (res.statusCode >= 400) logger.warn(msg);
+    else logger.debug(msg);
+  });
+  next();
+});
+
 // ─── Headers de sécurité (toutes les réponses) ────────────────────────────────
 app.use(securityHeaders);
 
@@ -76,8 +100,10 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 // ─── Gestionnaire d'erreurs global ────────────────────────────────────────────
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, _next) => {
-  console.error('[Error]', err.message);
-  res.status(err.status || 500).json({ error: 'Erreur serveur' });
+  const status = err.status || err.statusCode || 500;
+  logger.error(`${req.method} ${req.originalUrl} — ${err.message}`);
+  if (process.env.NODE_ENV !== 'production') logger.error(err.stack);
+  res.status(status).json({ error: status >= 500 ? 'Erreur serveur' : err.message });
 });
 
 // ─── Auto Notification Scheduler ──────────────────────────────────────────────

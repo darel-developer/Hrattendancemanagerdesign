@@ -77,13 +77,18 @@ function AdminDashboard() {
 
   useEffect(() => {
     const companyId = currentUser?.companyId;
-    Promise.all([
-      attendanceApi.getAll({ date: today }),
-      leavesApi.getAll(companyId ? { companyId } : {}),
-      attendanceApi.getAll({ startDate: weekDates[0], endDate: weekDates[6] }),
-    ])
-      .then(([att, lvs, week]) => { setTodayRecords(att); setAllLeaves(lvs); setWeekRecords(week); })
-      .catch(console.error);
+    const fetch = () => {
+      Promise.all([
+        attendanceApi.getAll({ date: today }),
+        leavesApi.getAll(companyId ? { companyId } : {}),
+        attendanceApi.getAll({ startDate: weekDates[0], endDate: weekDates[6] }),
+      ])
+        .then(([att, lvs, week]) => { setTodayRecords(att); setAllLeaves(lvs); setWeekRecords(week); })
+        .catch(console.error);
+    };
+    fetch();
+    const t = setInterval(fetch, 15000);
+    return () => clearInterval(t);
   }, [today, currentUser?.companyId]);
 
   const weeklyChartData = weekDates.map((date) => {
@@ -290,9 +295,14 @@ function ManagerDashboard() {
   const today = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
-    Promise.all([attendanceApi.getAll({ date: today }), leavesApi.getAll()])
-      .then(([att, lvs]) => { setTodayAllRecords(att); setAllLeaves(lvs); })
-      .catch(console.error);
+    const fetch = () => {
+      Promise.all([attendanceApi.getAll({ date: today }), leavesApi.getAll()])
+        .then(([att, lvs]) => { setTodayAllRecords(att); setAllLeaves(lvs); })
+        .catch(console.error);
+    };
+    fetch();
+    const t = setInterval(fetch, 15000);
+    return () => clearInterval(t);
   }, [today]);
 
   const myDept = currentUser?.department;
@@ -388,12 +398,17 @@ function EmployeeDashboard() {
 
   useEffect(() => {
     if (!currentUser) return;
-    Promise.all([
-      attendanceApi.getAll({ employeeId: currentUser.id }),
-      leavesApi.getAll({ employeeId: currentUser.id }),
-    ])
-      .then(([att, lvs]) => { setMyRecords(att); setMyLeaves(lvs); })
-      .catch(console.error);
+    const fetch = () => {
+      Promise.all([
+        attendanceApi.getAll({ employeeId: currentUser.id }),
+        leavesApi.getAll({ employeeId: currentUser.id }),
+      ])
+        .then(([att, lvs]) => { setMyRecords(att); setMyLeaves(lvs); })
+        .catch(console.error);
+    };
+    fetch();
+    const t = setInterval(fetch, 30000);
+    return () => clearInterval(t);
   }, [currentUser?.id]);
 
   const todayRecord = myRecords.find((r) => r.date === today);
