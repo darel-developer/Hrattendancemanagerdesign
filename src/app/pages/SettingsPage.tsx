@@ -129,13 +129,26 @@ export function SettingsPage() {
     setGeoDetecting(true);
     setGeoDetectError("");
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCompanyForm((p) => ({
-          ...p,
-          latitude: Math.round(pos.coords.latitude * 10000000) / 10000000,
-          longitude: Math.round(pos.coords.longitude * 10000000) / 10000000,
-        }));
+      async (pos) => {
+        const lat = Math.round(pos.coords.latitude * 10000000) / 10000000;
+        const lng = Math.round(pos.coords.longitude * 10000000) / 10000000;
+        setCompanyForm((p) => ({ ...p, latitude: lat, longitude: lng }));
         setGeoDetecting(false);
+        // Auto-sauvegarde immédiate en base dès la détection
+        if (currentCompany) {
+          try {
+            await companiesApi.update(currentCompany.id, {
+              ...companyForm,
+              latitude: lat,
+              longitude: lng,
+            });
+            await refreshCompany();
+            setSaved(true);
+            setTimeout(() => setSaved(false), 2500);
+          } catch {
+            setGeoDetectError("Position détectée mais la sauvegarde a échoué. Cliquez sur Enregistrer.");
+          }
+        }
       },
       () => {
         setGeoDetectError("Impossible d'obtenir la position. Vérifiez les permissions du navigateur.");
