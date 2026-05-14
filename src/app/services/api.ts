@@ -10,7 +10,9 @@ import type {
   TeamShift,
 } from "../data/mockData";
 
-const API_BASE = "/api";
+// Dev : VITE_API_URL absent → /api proxifié par Vite vers localhost:3002
+// Prod : VITE_API_URL=https://xxx.koyeb.app → requêtes directes vers Koyeb
+const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "/api";
 
 let _authToken: string | null = null;
 

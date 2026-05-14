@@ -58,7 +58,7 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,ht
 
 const corsOptions = {
   origin(origin, cb) {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error(`Origine non autorisée: ${origin}`));
   },
   credentials: true,
@@ -174,9 +174,12 @@ async function generateMonthlyReport() {
 
       const empIds = employees.map(e => e.id);
       const placeholders = empIds.map(() => '?').join(',');
+      const monthStart = `${monthStr}-01`;
+      const nextMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 1);
+      const monthEnd = nextMonth.toISOString().slice(0, 10);
       const [records] = await db.query(
-        `SELECT * FROM attendance_records WHERE employee_id IN (${placeholders}) AND date LIKE ?`,
-        [...empIds, `${monthStr}%`]
+        `SELECT * FROM attendance_records WHERE employee_id IN (${placeholders}) AND date >= ? AND date < ?`,
+        [...empIds, monthStart, monthEnd]
       );
 
       const presents = records.filter(r => r.status === 'Présent' || r.status === 'Télétravail').length;
@@ -304,10 +307,14 @@ app.listen(PORT, async () => {
     console.error('[DB] Erreur colonnes géo :', err.message);
   }
   // Convertir department de ENUM → VARCHAR pour accepter les départements personnalisés
+  // (PostgreSQL ne supporte pas ENUM inline dans les migrations — on s'assure juste que la colonne existe en VARCHAR)
   try {
-    const [cols] = await db.query("SHOW COLUMNS FROM employees LIKE 'department'");
-    if (cols.length > 0 && cols[0].Type.startsWith('enum')) {
-      await db.query("ALTER TABLE employees MODIFY COLUMN department VARCHAR(100) NOT NULL DEFAULT ''");
+    const [cols] = await db.query(
+      `SELECT column_name, data_type FROM information_schema.columns
+       WHERE table_name = 'employees' AND column_name = 'department' AND table_schema = current_schema()`
+    );
+    if (cols.length > 0 && cols[0].data_type === 'USER-DEFINED') {
+      await db.query("ALTER TABLE employees ALTER COLUMN department TYPE VARCHAR(100)");
       console.log('[DB] Colonne department convertie ENUM → VARCHAR');
     }
   } catch (err) {
@@ -315,7 +322,10 @@ app.listen(PORT, async () => {
   }
   // Ajouter colonne work_days si absente
   try {
-    const [wdCols] = await db.query("SHOW COLUMNS FROM employees LIKE 'work_days'");
+    const [wdCols] = await db.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'employees' AND column_name = 'work_days' AND table_schema = current_schema()`
+    );
     if (wdCols.length === 0) {
       await db.query("ALTER TABLE employees ADD COLUMN work_days VARCHAR(255) DEFAULT NULL");
       console.log('[DB] Colonne work_days ajoutée');

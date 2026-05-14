@@ -20,9 +20,9 @@ function mapCompany(row) {
 }
 
 async function ensureGeoColumns() {
-  await db.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS latitude DECIMAL(10,7) NULL`);
-  await db.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS longitude DECIMAL(10,7) NULL`);
-  await db.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS geo_radius INT NOT NULL DEFAULT 100`);
+  await db.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS latitude NUMERIC(10,7) NULL`);
+  await db.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS longitude NUMERIC(10,7) NULL`);
+  await db.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS geo_radius INTEGER NOT NULL DEFAULT 100`);
 }
 
 router.get('/', async (_req, res) => {

@@ -62,9 +62,9 @@ router.post('/', requireAuth, async (req, res) => {
       `INSERT INTO attendance_records
         (id, employee_id, date, check_in, check_out, status, hours_worked, note)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-        check_in=VALUES(check_in), check_out=VALUES(check_out),
-        status=VALUES(status), hours_worked=VALUES(hours_worked), note=VALUES(note)`,
+       ON CONFLICT (employee_id, date) DO UPDATE SET
+        check_in=EXCLUDED.check_in, check_out=EXCLUDED.check_out,
+        status=EXCLUDED.status, hours_worked=EXCLUDED.hours_worked, note=EXCLUDED.note`,
       [id, r.employeeId, r.date, r.checkIn || null, r.checkOut || null,
        status, r.hoursWorked ?? null, r.note || '']
     );

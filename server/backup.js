@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Script de sauvegarde automatique de la base de données MySQL.
+ * Script de sauvegarde automatique de la base de données PostgreSQL.
  *
  * Usage :
  *   node backup.js              → backup immédiat
@@ -20,25 +20,25 @@ const BACKUP_DIR = path.join(__dirname, 'backups');
 const RETENTION = parseInt(process.env.BACKUP_RETENTION || '30', 10);
 
 const DB_HOST = process.env.DB_HOST || 'localhost';
-const DB_PORT = process.env.DB_PORT || '3306';
-const DB_USER = process.env.DB_USER || 'root';
+const DB_PORT = process.env.DB_PORT || '5432';
+const DB_USER = process.env.DB_USER || 'postgres';
 const DB_PASS = process.env.DB_PASSWORD || '';
 const DB_NAME = process.env.DB_NAME || 'hr_attendance_db';
 
-// Chemin mysqldump selon l'OS
-function getMysqldumpPath() {
+// Chemin pg_dump selon l'OS
+function getPgDumpPath() {
   if (os.platform() === 'win32') {
-    // Cherche mysqldump dans les emplacements XAMPP courants
     const candidates = [
-      'C:\\xampp\\mysql\\bin\\mysqldump.exe',
-      'C:\\wamp64\\bin\\mysql\\mysql8.0.31\\bin\\mysqldump.exe',
-      'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysqldump.exe',
+      'C:\\Program Files\\PostgreSQL\\16\\bin\\pg_dump.exe',
+      'C:\\Program Files\\PostgreSQL\\15\\bin\\pg_dump.exe',
+      'C:\\Program Files\\PostgreSQL\\14\\bin\\pg_dump.exe',
+      'C:\\Program Files\\PostgreSQL\\13\\bin\\pg_dump.exe',
     ];
     for (const p of candidates) {
       if (fs.existsSync(p)) return p;
     }
   }
-  return 'mysqldump'; // Dans le PATH sur Linux/Mac
+  return 'pg_dump'; // Dans le PATH sur Linux/Mac
 }
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -55,21 +55,21 @@ function runBackup() {
     const filename = `backup_${DB_NAME}_${getTimestamp()}.sql`;
     const filepath = path.join(BACKUP_DIR, filename);
 
-    const mysqldump = getMysqldumpPath();
+    const pgDump = getPgDumpPath();
     const args = [
       `--host=${DB_HOST}`,
       `--port=${DB_PORT}`,
-      `--user=${DB_USER}`,
-      DB_PASS ? `--password=${DB_PASS}` : '--password=',
-      '--single-transaction',
-      '--routines',
-      '--triggers',
-      '--add-drop-table',
-      '--complete-insert',
+      `--username=${DB_USER}`,
+      '--no-password',
+      '--format=plain',
+      '--clean',
+      '--if-exists',
       DB_NAME,
     ];
 
-    const child = execFile(mysqldump, args, { maxBuffer: 100 * 1024 * 1024 }, (err, stdout) => {
+    const env = { ...process.env, PGPASSWORD: DB_PASS };
+
+    const child = execFile(pgDump, args, { maxBuffer: 100 * 1024 * 1024, env }, (err, stdout) => {
       if (err) return reject(err);
 
       fs.writeFileSync(filepath, stdout, 'utf8');
@@ -85,17 +85,17 @@ function runBackup() {
         const toDelete = files.slice(0, files.length - RETENTION);
         for (const f of toDelete) {
           fs.unlinkSync(path.join(BACKUP_DIR, f));
-          console.log(`[Backup] 🗑 Supprimé (rétention) : ${f}`);
+          console.log(`[Backup] Supprimé (rétention) : ${f}`);
         }
       }
 
       resolve(filepath);
     });
 
-    // Capturer stderr séparément pour les avertissements mysqldump
+    // Capturer stderr séparément pour les avertissements pg_dump
     child.stderr.on('data', (data) => {
       const msg = String(data).trim();
-      if (msg && !msg.includes('Using a password on the command line')) {
+      if (msg) {
         console.warn('[Backup] Warning:', msg);
       }
     });

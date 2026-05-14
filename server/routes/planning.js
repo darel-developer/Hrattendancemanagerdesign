@@ -50,9 +50,9 @@ router.post('/', async (req, res) => {
       `INSERT INTO team_shifts
         (id, employee_id, date, start_time, end_time, shift_type, note, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-       ON DUPLICATE KEY UPDATE
-        start_time=VALUES(start_time), end_time=VALUES(end_time),
-        shift_type=VALUES(shift_type), note=VALUES(note)`,
+       ON CONFLICT (id) DO UPDATE SET
+        start_time=EXCLUDED.start_time, end_time=EXCLUDED.end_time,
+        shift_type=EXCLUDED.shift_type, note=EXCLUDED.note`,
       [
         id, s.employeeId, s.date, s.startTime || null,
         s.endTime || null, s.shiftType || 'Matin', s.note || '',

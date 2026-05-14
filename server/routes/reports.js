@@ -11,17 +11,17 @@ async function ensureTable() {
       title           VARCHAR(255) NOT NULL,
       type            VARCHAR(100) NOT NULL DEFAULT 'Rapport',
       content         TEXT NOT NULL,
-      created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       is_read         BOOLEAN DEFAULT FALSE,
       attachment_name VARCHAR(255) NULL,
-      attachment_data LONGTEXT NULL,
+      attachment_data TEXT NULL,
       CONSTRAINT fk_rpt_sender    FOREIGN KEY (sender_id)    REFERENCES employees(id) ON DELETE CASCADE,
       CONSTRAINT fk_rpt_recipient FOREIGN KEY (recipient_id) REFERENCES employees(id) ON DELETE SET NULL
-    ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+    )
   `);
   // Migration pour tables existantes
   await db.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS attachment_name VARCHAR(255) NULL`);
-  await db.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS attachment_data LONGTEXT NULL`);
+  await db.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS attachment_data TEXT NULL`);
 }
 
 function mapReport(row) {

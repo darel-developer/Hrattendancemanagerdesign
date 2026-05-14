@@ -9,11 +9,11 @@ async function ensureTable() {
       company_id VARCHAR(50) NOT NULL,
       name VARCHAR(100) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY unique_dept_per_company (company_id, name)
+      UNIQUE (company_id, name)
     )
   `);
   await db.query(`
-    INSERT IGNORE INTO departments (id, company_id, name)
+    INSERT INTO departments (id, company_id, name)
     SELECT CONCAT('DEPT', UPPER(SUBSTR(MD5(CONCAT(company_id, department)), 1, 10))),
            company_id, department
     FROM (
@@ -21,6 +21,7 @@ async function ensureTable() {
       FROM employees
       WHERE department IS NOT NULL AND department != ''
     ) AS t
+    ON CONFLICT DO NOTHING
   `);
 }
 
@@ -53,7 +54,7 @@ router.post('/', async (req, res) => {
     );
     res.status(201).json({ id, companyId, name: trimmed, employeeCount: 0 });
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Ce département existe déjà' });
+    if (err.code === '23505') return res.status(409).json({ error: 'Ce département existe déjà' });
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -98,7 +99,7 @@ router.put('/:id', async (req, res) => {
     );
     res.json({ id: req.params.id, companyId, name: trimmed, employeeCount: parseInt(countRow[0].cnt) });
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Ce département existe déjà' });
+    if (err.code === '23505') return res.status(409).json({ error: 'Ce département existe déjà' });
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

@@ -129,7 +129,7 @@ router.post('/', requireAuth, requireRole('Admin'), async (req, res) => {
     const [rows] = await db.query('SELECT * FROM employees WHERE id = ?', [e.id]);
     res.status(201).json(mapEmployee(rows[0]));
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Email ou ID déjà utilisé' });
+    if (err.code === '23505') return res.status(409).json({ error: 'Email ou ID déjà utilisé' });
     console.error('[Employees] POST /', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
@@ -175,7 +175,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ error: 'Employé non trouvé' });
     res.json(mapEmployee(rows[0]));
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Email déjà utilisé' });
+    if (err.code === '23505') return res.status(409).json({ error: 'Email déjà utilisé' });
     console.error('[Employees] PUT /:id', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
