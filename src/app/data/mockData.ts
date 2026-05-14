@@ -53,6 +53,8 @@ export interface AttendanceRecord {
   status: AttendanceStatus;
   hoursWorked: number | null;
   note: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 // ─── Leave requests ───────────────────────────────────────────────────────────

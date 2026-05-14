@@ -4,6 +4,13 @@ const router = express.Router();
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000, r = (v) => v * Math.PI / 180;
+  const dLat = r(lat2 - lat1), dLon = r(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function mapRecord(row) {
   return {
     id: row.id,
@@ -40,20 +47,46 @@ router.post('/', requireAuth, async (req, res) => {
     const r = req.body;
     const id = r.id || `ATT${Date.now()}`;
 
-    // Auto-compute status at check-in time using company work_start + late_tolerance
+    // Auto-compute status + geo validation for présentiel check-in
     let status = r.status;
     if (r.checkIn && !r.checkOut && r.status !== 'Télétravail' && r.status !== 'Congé') {
       try {
-        const [empRows] = await db.query('SELECT company_id FROM employees WHERE id = ?', [r.employeeId]);
+        const [empRows] = await db.query(
+          `SELECT e.company_id, c.work_start, c.late_tolerance, c.latitude, c.longitude, c.geo_radius
+           FROM employees e JOIN companies c ON e.company_id = c.id WHERE e.id = ?`,
+          [r.employeeId]
+        );
         if (empRows.length > 0) {
-          const [compRows] = await db.query('SELECT work_start, late_tolerance FROM companies WHERE id = ?', [empRows[0].company_id]);
-          if (compRows.length > 0) {
-            const workStart = String(compRows[0].work_start || '09:00').slice(0, 5);
-            const lateTol = compRows[0].late_tolerance ?? 5;
-            const [wh, wm] = workStart.split(':').map(Number);
-            const [ch, cm] = r.checkIn.split(':').map(Number);
-            status = (ch * 60 + cm) > (wh * 60 + wm + lateTol) ? 'Retard' : 'Présent';
+          const comp = empRows[0];
+
+          // ── Geo enforcement (same logic as kiosk) ─────────────────────────
+          if (comp.latitude !== null && comp.longitude !== null) {
+            const clientLat = r.latitude != null ? parseFloat(r.latitude) : null;
+            const clientLon = r.longitude != null ? parseFloat(r.longitude) : null;
+            if (clientLat == null || clientLon == null) {
+              return res.status(403).json({
+                error: 'Localisation GPS requise pour pointer dans cette entreprise.',
+                geoRequired: true,
+              });
+            }
+            const dist = haversineMeters(clientLat, clientLon, parseFloat(comp.latitude), parseFloat(comp.longitude));
+            const radius = comp.geo_radius || 100;
+            if (dist > radius) {
+              return res.status(403).json({
+                error: `Vous êtes trop loin de l'entreprise pour pointer. (${Math.round(dist)} m, rayon autorisé : ${radius} m)`,
+                geoRequired: true,
+                distance: Math.round(dist),
+                radius,
+              });
+            }
           }
+
+          // ── Late tolerance ────────────────────────────────────────────────
+          const workStart = String(comp.work_start || '09:00').slice(0, 5);
+          const lateTol = comp.late_tolerance ?? 5;
+          const [wh, wm] = workStart.split(':').map(Number);
+          const [ch, cm] = r.checkIn.split(':').map(Number);
+          status = (ch * 60 + cm) > (wh * 60 + wm + lateTol) ? 'Retard' : 'Présent';
         }
       } catch (_) { /* keep client-submitted status as fallback */ }
     }

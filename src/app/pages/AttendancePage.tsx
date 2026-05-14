@@ -32,9 +32,10 @@ function useAttendanceGeo(
   companyLat?: number | null,
   companyLng?: number | null,
   geoRadius = 100
-): { geoStatus: GeoStatus; distance: number | null; retry: () => void } {
+): { geoStatus: GeoStatus; distance: number | null; coords: { lat: number; lng: number } | null; retry: () => void } {
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [distance, setDistance] = useState<number | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   const check = useCallback(() => {
     if (companyLat == null || companyLng == null) {
@@ -44,12 +45,14 @@ function useAttendanceGeo(
     setGeoStatus("checking");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const d = Math.round(haversineMeters(pos.coords.latitude, pos.coords.longitude, companyLat, companyLng));
+        const { latitude, longitude } = pos.coords;
+        setCoords({ lat: latitude, lng: longitude });
+        const d = Math.round(haversineMeters(latitude, longitude, companyLat, companyLng));
         setDistance(d);
         setGeoStatus(d <= geoRadius ? "allowed" : "denied");
       },
       () => setGeoStatus("error"),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }, [companyLat, companyLng, geoRadius]);
 
@@ -59,7 +62,7 @@ function useAttendanceGeo(
     return () => clearInterval(id);
   }, [check]);
 
-  return { geoStatus, distance, retry: check };
+  return { geoStatus, distance, coords, retry: check };
 }
 
 function computeCheckInStatus(
@@ -90,13 +93,14 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
   const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
   const [recordedStatus, setRecordedStatus] = useState<string>("");
 
-  const { geoStatus, distance, retry: retryGeo } = useAttendanceGeo(
+  const { geoStatus, distance, coords: geoCoords, retry: retryGeo } = useAttendanceGeo(
     currentCompany?.latitude,
     currentCompany?.longitude,
     currentCompany?.geoRadius ?? 100
   );
   const geoRequired = currentCompany?.latitude != null && currentCompany?.longitude != null;
   const canCheckIn = !geoRequired || workMode === "télétravail" || geoStatus === "allowed";
+  const [geoBlockError, setGeoBlockError] = useState<string | null>(null);
 
   // ── Offline queue ──────────────────────────────────────────────────────────
   const lastSyncedId = useRef<string | null>(null);
@@ -185,6 +189,7 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
       setCheckInState("in");
       return;
     }
+    setGeoBlockError(null);
     const today = new Date().toISOString().split("T")[0];
     const recordedTime = showManualEntry && manualTime ? manualTime : formatTime(time);
     const status = workMode === "télétravail"
@@ -192,6 +197,10 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
       : currentCompany
         ? computeCheckInStatus(recordedTime, currentCompany.workStart ?? "09:00", currentCompany.lateTolerance ?? 5)
         : "Présent";
+    // Include GPS coords so the server can validate the position independently
+    const geoPayload = workMode === "présentiel" && geoCoords
+      ? { latitude: geoCoords.lat, longitude: geoCoords.lng }
+      : {};
     try {
       const created = await attendanceApi.create({
         employeeId,
@@ -199,19 +208,30 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
         checkIn: recordedTime,
         status,
         note: note || "",
+        ...geoPayload,
       });
       setSavedRecordId(created.id);
       setRecordedStatus(created.status ?? status);
       onRefresh?.();
-    } catch {
+      setCheckInTime(recordedTime);
+      setCheckInState("in");
+      setShowManualEntry(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("trop loin") || msg.includes("GPS requis") || msg.includes("Localisation")) {
+        // Server-side geo rejection — don't queue, show the error
+        setGeoBlockError(msg);
+        retryGeo(); // refresh the position display
+        return;
+      }
       // Network error — save optimistically and queue for later sync
       enqueue({ type: "checkIn", employeeId, date: today, checkIn: recordedTime, status, note: note || "" });
       setPendingCount((c) => c + 1);
       setRecordedStatus(status);
+      setCheckInTime(recordedTime);
+      setCheckInState("in");
+      setShowManualEntry(false);
     }
-    setCheckInTime(recordedTime);
-    setCheckInState("in");
-    setShowManualEntry(false);
   };
 
   const handleCheckOut = async () => {
@@ -351,6 +371,17 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Server-side geo rejection message */}
+        {geoBlockError && (
+          <div
+            className="flex items-center gap-2 p-3 rounded-xl"
+            style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)" }}
+          >
+            <AlertCircle size={13} style={{ color: "#EF4444", flexShrink: 0 }} />
+            <span className="text-xs" style={{ color: "#FCA5A5", fontWeight: 600 }}>{geoBlockError}</span>
+          </div>
+        )}
 
         {/* Offline sync indicator */}
         {pendingCount > 0 && (
