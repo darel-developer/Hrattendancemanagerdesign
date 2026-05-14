@@ -31,21 +31,21 @@ function StatCard({ title, value, change, changeType, icon: Icon, color, bg, del
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
-      className="rounded-2xl p-5 flex flex-col gap-3"
+      className="rounded-2xl p-3 md:p-5 flex flex-col gap-2 md:gap-3"
       style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}
     >
       <div className="flex items-center justify-between">
-        <p className="text-sm" style={{ color: "var(--hr-text-muted)" }}>{title}</p>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: bg }}>
-          <Icon size={17} style={{ color }} />
+        <p className="text-xs md:text-sm truncate pr-1" style={{ color: "var(--hr-text-muted)" }}>{title}</p>
+        <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: bg }}>
+          <Icon size={15} style={{ color }} />
         </div>
       </div>
       <div>
-        <p className="text-3xl" style={{ fontWeight: 800, color: "var(--hr-text)" }}>{value}</p>
+        <p className="text-2xl md:text-3xl" style={{ fontWeight: 800, color: "var(--hr-text)" }}>{value}</p>
         {change && (
           <div className="flex items-center gap-1 mt-1">
             {changeType === "up" && <ArrowUpRight size={12} style={{ color: "#10B981" }} />}
-            <p className="text-xs" style={{ color: changeType === "up" ? "#10B981" : changeType === "down" ? "#EF4444" : "var(--hr-text-muted)" }}>
+            <p className="text-xs truncate" style={{ color: changeType === "up" ? "#10B981" : changeType === "down" ? "#EF4444" : "var(--hr-text-muted)" }}>
               {change}
             </p>
           </div>
@@ -142,15 +142,15 @@ function AdminDashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard title="Employés actifs" value={activeEmployees.length} change="+1 ce mois" changeType="up" icon={Users} color="#6366F1" bg="#EDE9FE" delay={0.05} />
         <StatCard title="Présents aujourd'hui" value={presentCount} change={`${Math.round((presentCount / Math.max(activeEmployees.length, 1)) * 100)}% du total`} changeType="up" icon={UserCheck} color="#10B981" bg="#D1FAE5" delay={0.1} />
         <StatCard title="Absences / Retards" value={absentCount + lateCount} change={`${absentCount} absents, ${lateCount} retards`} changeType={absentCount + lateCount > 2 ? "down" : "neutral"} icon={UserX} color="#EF4444" bg="#FEE2E2" delay={0.15} />
         <StatCard title="Congés en attente" value={pendingLeaves} change="À valider" changeType="neutral" icon={CalendarDays} color="#F59E0B" bg="#FEF3C7" delay={0.2} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 md:gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
           className="xl:col-span-2 rounded-2xl p-5"
           style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}
@@ -207,9 +207,9 @@ function AdminDashboard() {
         </motion.div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-          className="rounded-2xl p-5"
+          className="rounded-2xl p-4 md:p-5"
           style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}
         >
           <div className="flex items-center justify-between mb-4">
@@ -246,7 +246,7 @@ function AdminDashboard() {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
-          className="rounded-2xl p-5"
+          className="rounded-2xl p-4 md:p-5"
           style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}
         >
           <div className="flex items-center justify-between mb-4">
@@ -350,7 +350,7 @@ function ManagerDashboard() {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard title="Membres" value={deptEmployees.length} change={`Dept. ${myDept}`} changeType="neutral" icon={Users} color="#6366F1" bg="#EDE9FE" delay={0.05} />
         <StatCard title="Présents" value={presentCount} change={`${Math.round((presentCount / Math.max(deptEmployees.length, 1)) * 100)}%`} changeType="up" icon={UserCheck} color="#10B981" bg="#D1FAE5" delay={0.1} />
         <StatCard title="Abs. / Retards" value={absentCount + lateCount} change={`${absentCount} absents · ${lateCount} retards`} changeType={absentCount + lateCount > 0 ? "down" : "neutral"} icon={UserX} color="#EF4444" bg="#FEE2E2" delay={0.15} />
@@ -437,21 +437,21 @@ function EmployeeDashboard() {
   const avgHours = thisWeekRecords.reduce((acc, r) => acc + (r.hoursWorked ?? 0), 0) / Math.max(thisWeekRecords.length, 1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl p-5 flex items-center justify-between"
+        className="rounded-2xl p-4 md:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
         style={{ background: "linear-gradient(135deg, #0B1437 0%, #1E1B4B 100%)", border: "1px solid rgba(99,102,241,0.2)" }}
       >
         <div>
-          <p className="text-white mb-0.5" style={{ fontWeight: 800, fontSize: "1.1rem" }}>
+          <p className="text-white mb-0.5 text-sm md:text-base" style={{ fontWeight: 800 }}>
             Bonjour, {currentUser?.firstName} 👋
           </p>
           <p className="text-xs" style={{ color: "#94A3B8" }}>
             {currentUser?.position} · {currentUser?.department}
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-white" style={{ fontWeight: 800, fontSize: "1.5rem", fontVariantNumeric: "tabular-nums" }}>
+        <div className="text-left sm:text-right">
+          <p className="text-white" style={{ fontWeight: 800, fontSize: "1.25rem", fontVariantNumeric: "tabular-nums" }}>
             {currentTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
           </p>
           <p className="text-xs mt-0.5" style={{ color: "#6366F1" }}>
@@ -460,17 +460,17 @@ function EmployeeDashboard() {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard title="Présences ce mois" value={myRecords.filter(r => r.status === "Présent").length} change="Journées" changeType="up" icon={CheckCircle2} color="#10B981" bg="#D1FAE5" delay={0.05} />
         <StatCard title="Congés restants" value={`${leaveBalance}j`} change={`${currentUser?.leaveUsed} utilisés`} changeType="neutral" icon={CalendarDays} color="#6366F1" bg="#EDE9FE" delay={0.1} />
         <StatCard title="Moy. heures/jour" value={`${avgHours.toFixed(1)}h`} change="Cette semaine" changeType="neutral" icon={Clock} color="#F59E0B" bg="#FEF3C7" delay={0.15} />
         <StatCard title="Demandes en cours" value={pendingLeaves.length} change="En attente" changeType="neutral" icon={Timer} color="#8B5CF6" bg="#EDE9FE" delay={0.2} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
         {/* Today status */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-          className="rounded-2xl p-5"
+          className="rounded-2xl p-4 md:p-5"
           style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}
         >
           <div className="flex items-center justify-between mb-4">
@@ -531,7 +531,7 @@ function EmployeeDashboard() {
 
         {/* My leaves */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-          className="rounded-2xl p-5"
+          className="rounded-2xl p-4 md:p-5"
           style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}
         >
           <div className="flex items-center justify-between mb-4">

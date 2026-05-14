@@ -944,7 +944,8 @@ export function ReportsPage() {
           style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
         >
           <Edit3 size={15} />
-          Rédiger un rapport
+          <span className="hidden sm:inline">Rédiger un rapport</span>
+          <span className="sm:hidden">Rédiger</span>
         </button>
       </div>
 
@@ -970,7 +971,7 @@ export function ReportsPage() {
                   ) : (
                     <Download size={11} />
                   )}
-                  PDF
+                  <span className="hidden sm:inline">PDF</span>
                 </div>
               </div>
               <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>{r.title}</p>
@@ -1053,7 +1054,7 @@ export function ReportsPage() {
       )}
 
       {/* Period selector */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Analyses statistiques</h2>
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)" }}>
           {(["semaine", "mois", "trimestre"] as const).map((p) => (
@@ -1072,7 +1073,7 @@ export function ReportsPage() {
       </div>
 
       {/* Charts grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="rounded-2xl p-5"
           style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}

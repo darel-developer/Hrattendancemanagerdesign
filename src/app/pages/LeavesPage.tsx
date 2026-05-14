@@ -71,7 +71,7 @@ function NewLeaveModal({ onClose, onSubmit, currentUserId, currentUserName, leav
       <motion.div
         initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="w-full max-w-md rounded-2xl p-6"
+        className="w-full max-w-md rounded-2xl p-5 md:p-6 mx-4 md:mx-auto"
         style={{ background: "var(--hr-card)", maxHeight: "90vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -353,9 +353,9 @@ export function LeavesPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 md:space-y-5">
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3 md:gap-4">
         {[
           { label: "En attente", value: pending, color: "#D97706", bg: "#FEF3C7", icon: Clock },
           { label: "Approuvés", value: approved, color: "#16A34A", bg: "#D1FAE5", icon: CheckCircle2 },
@@ -402,11 +402,11 @@ export function LeavesPage() {
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex gap-2 overflow-x-auto pb-1 flex-1" style={{ scrollbarWidth: "none" }}>
           {["Tous", "En attente", "Approuvé", "Refusé"].map((s) => (
             <button key={s} onClick={() => setFilterStatus(s)}
-              className="px-3 py-1.5 rounded-xl text-xs transition-all"
+              className="px-3 py-1.5 rounded-xl text-xs transition-all flex-shrink-0"
               style={{
                 background: filterStatus === s ? "#6366F1" : "var(--hr-card)",
                 color: filterStatus === s ? "white" : "var(--hr-text-muted)",
@@ -419,18 +419,19 @@ export function LeavesPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={exportCSV}
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all"
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm transition-all"
             style={{ background: "var(--hr-card)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600 }}
           >
             <Download size={15} />
-            CSV
+            <span className="hidden sm:inline">CSV</span>
           </button>
+          {/* Desktop button */}
           <button
             onClick={() => setShowNewModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90"
+            className="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90"
             style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
           >
             <Plus size={15} />
@@ -438,6 +439,16 @@ export function LeavesPage() {
           </button>
         </div>
       </div>
+
+      {/* Mobile floating button */}
+      <button
+        onClick={() => setShowNewModal(true)}
+        className="md:hidden fixed z-30 flex items-center gap-2 px-4 py-3 rounded-2xl text-white text-sm shadow-lg transition-all hover:opacity-90"
+        style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700, bottom: "5rem", right: "1rem" }}
+      >
+        <Plus size={16} />
+        Nouvelle demande
+      </button>
 
       {/* Leaves list */}
       <div className="space-y-3">

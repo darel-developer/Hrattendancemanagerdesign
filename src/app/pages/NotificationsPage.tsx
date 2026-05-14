@@ -87,47 +87,47 @@ export function NotificationsPage() {
   ];
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-4 md:space-y-5 max-w-3xl">
       {/* Summary banner */}
       {unreadCount > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl p-4 flex items-center justify-between"
+          className="rounded-2xl p-3 md:p-4 flex items-center justify-between gap-3"
           style={{ background: "linear-gradient(135deg, #FEF3C7, #FEF9C3)", border: "1.5px solid #FDE68A" }}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#FDE68A" }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#FDE68A" }}>
               <Bell size={17} style={{ color: "#D97706" }} />
             </div>
-            <div>
-              <p className="text-sm" style={{ fontWeight: 700, color: "#92400E" }}>
+            <div className="min-w-0">
+              <p className="text-sm truncate" style={{ fontWeight: 700, color: "#92400E" }}>
                 {unreadCount} notification{unreadCount > 1 ? "s" : ""} non lue{unreadCount > 1 ? "s" : ""}
               </p>
-              <p className="text-xs" style={{ color: "#B45309" }}>
+              <p className="text-xs hidden sm:block" style={{ color: "#B45309" }}>
                 Certaines nécessitent votre attention
               </p>
             </div>
           </div>
           <button
             onClick={markAllRead}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all hover:opacity-80"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs transition-all hover:opacity-80 flex-shrink-0 min-h-[44px]"
             style={{ background: "#FDE68A", color: "#92400E", fontWeight: 700 }}
           >
             <CheckCheck size={13} />
-            Tout marquer lu
+            <span className="hidden sm:inline">Tout marquer lu</span>
           </button>
         </motion.div>
       )}
 
       {/* Filters */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex gap-2 overflow-x-auto pb-1 flex-1" style={{ scrollbarWidth: "none" }}>
           {categories.map((cat) => (
             <button
               key={cat.key}
               onClick={() => setFilter(cat.key as any)}
-              className="px-3 py-1.5 rounded-xl text-xs transition-all"
+              className="px-3 py-1.5 rounded-xl text-xs transition-all flex-shrink-0"
               style={{
                 background: filter === cat.key ? "#6366F1" : "white",
                 color: filter === cat.key ? "white" : "#6B7280",
@@ -143,11 +143,11 @@ export function NotificationsPage() {
         {notifs.length > 0 && (
           <button
             onClick={clearAll}
-            className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600 transition-colors flex-shrink-0 min-h-[44px]"
             style={{ fontWeight: 600 }}
           >
             <Trash2 size={13} />
-            Tout effacer
+            <span className="hidden sm:inline">Tout effacer</span>
           </button>
         )}
       </div>
@@ -178,7 +178,7 @@ export function NotificationsPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20, height: 0 }}
                   transition={{ delay: i * 0.04 }}
-                  className="flex items-start gap-4 p-4 rounded-2xl cursor-pointer group"
+                  className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-2xl cursor-pointer group"
                   style={{
                     background: n.isRead ? "white" : "rgba(99,102,241,0.03)",
                     border: "1.5px solid",

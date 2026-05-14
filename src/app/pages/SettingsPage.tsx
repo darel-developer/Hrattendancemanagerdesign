@@ -182,7 +182,7 @@ export function SettingsPage() {
   ] as const;
 
   return (
-    <div className="flex gap-5 max-w-5xl">
+    <div className="flex flex-col md:flex-row gap-4 md:gap-5 max-w-5xl">
       {/* Photo URL modal */}
       <AnimatePresence>
         {showPhotoModal && (
@@ -247,28 +247,33 @@ export function SettingsPage() {
       </AnimatePresence>
 
       {/* Sidebar nav */}
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="w-52 flex-shrink-0">
+      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-52 flex-shrink-0">
         <div className="rounded-2xl overflow-hidden"
           style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
-          {sections.map((s) => (
-            <button key={s.id} onClick={() => setActiveSection(s.id)}
-              className="w-full flex items-center justify-between px-4 py-3 transition-all text-left"
-              style={{
-                background: activeSection === s.id ? "rgba(99,102,241,0.08)" : "transparent",
-                borderLeft: activeSection === s.id ? "3px solid #6366F1" : "3px solid transparent",
-              }}>
-              <div className="flex items-center gap-2.5">
-                <s.icon size={15} style={{ color: activeSection === s.id ? "#6366F1" : "var(--hr-text-light)" }} />
-                <p className="text-xs" style={{
-                  color: activeSection === s.id ? "#6366F1" : "var(--hr-text-sec)",
-                  fontWeight: activeSection === s.id ? 700 : 400,
+          {/* On mobile: horizontal scrollable tabs */}
+          <div className="flex md:flex-col overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            {sections.map((s) => (
+              <button key={s.id} onClick={() => setActiveSection(s.id)}
+                className="flex-shrink-0 md:w-full flex items-center justify-between px-3 md:px-4 py-3 transition-all text-left min-w-[80px] md:min-w-0"
+                style={{
+                  background: activeSection === s.id ? "rgba(99,102,241,0.08)" : "transparent",
+                  borderLeft: activeSection === s.id ? "3px solid #6366F1" : "3px solid transparent",
+                  borderBottom: activeSection === s.id ? "3px solid transparent" : "3px solid transparent",
                 }}>
-                  {s.label}
-                </p>
-              </div>
-              <ChevronRight size={13} style={{ color: "var(--hr-text-light)" }} />
-            </button>
-          ))}
+                <div className="flex flex-col md:flex-row items-center md:items-center gap-1 md:gap-2.5">
+                  <s.icon size={15} style={{ color: activeSection === s.id ? "#6366F1" : "var(--hr-text-light)" }} />
+                  <p className="text-xs text-center md:text-left" style={{
+                    color: activeSection === s.id ? "#6366F1" : "var(--hr-text-sec)",
+                    fontWeight: activeSection === s.id ? 700 : 400,
+                    fontSize: "10px",
+                  }}>
+                    {s.label}
+                  </p>
+                </div>
+                <ChevronRight size={13} className="hidden md:block" style={{ color: "var(--hr-text-light)" }} />
+              </button>
+            ))}
+          </div>
         </div>
       </motion.div>
 
@@ -278,7 +283,7 @@ export function SettingsPage() {
 
         {/* Profile */}
         {activeSection === "profile" && (
-          <div className="rounded-2xl p-6" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
+          <div className="rounded-2xl p-4 md:p-6" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
             <h2 className="text-sm mb-5" style={{ fontWeight: 800, color: "var(--hr-text)" }}>Profil personnel</h2>
 
             <div className="flex items-center gap-4 mb-6">
@@ -304,7 +309,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               {[
                 { label: "Prénom", val: currentUser?.firstName, icon: User },
                 { label: "Nom", val: currentUser?.lastName, icon: User },
@@ -326,7 +331,7 @@ export function SettingsPage() {
 
             <div className="mt-4 p-4 rounded-xl" style={{ background: "var(--hr-hover)", border: "1px solid var(--hr-card-border-hard)" }}>
               <p className="text-xs mb-3" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Informations RH</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {[
                   { label: "Salaire brut", value: `${currentUser?.salary?.toLocaleString("fr-FR")} FCFA/mois` },
                   { label: "Contrat", value: currentUser?.contractType },
@@ -340,7 +345,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="mt-5 flex items-center gap-3 justify-end">
+            <div className="mt-5 flex items-center gap-3 justify-end flex-wrap">
               {saved && (
                 <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
                   className="flex items-center gap-1.5 text-xs" style={{ color: "#10B981", fontWeight: 600 }}>
@@ -348,7 +353,7 @@ export function SettingsPage() {
                 </motion.div>
               )}
               <button onClick={handleSave}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90 w-full sm:w-auto min-h-[44px]"
                 style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}>
                 <Save size={14} /> Enregistrer
               </button>
@@ -436,7 +441,7 @@ export function SettingsPage() {
               )}
 
               <button onClick={handlePasswordChange} disabled={pwdSaving}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90 w-full sm:w-auto min-h-[44px]"
                 style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700, opacity: pwdSaving ? 0.7 : 1 }}>
                 <Save size={14} />
                 {pwdSaving ? "Mise à jour…" : "Mettre à jour le mot de passe"}

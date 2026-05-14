@@ -66,7 +66,7 @@ export function Header() {
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 
   return (
-    <header className="h-16 flex items-center justify-between px-3 md:px-6 border-b flex-shrink-0"
+    <header className="h-14 md:h-16 flex items-center justify-between px-3 md:px-6 border-b flex-shrink-0"
       style={{ background: "var(--hr-card)", borderColor: "var(--hr-card-border-hard)" }}>
       {/* Left */}
       <div className="flex items-center gap-3 min-w-0">
@@ -78,7 +78,7 @@ export function Header() {
           <Menu size={16} style={{ color: "var(--hr-text-muted)" }} />
         </button>
         <div className="min-w-0">
-          <h1 className="truncate" style={{ fontWeight: 700, fontSize: "1.125rem", color: "var(--hr-text)" }}>
+          <h1 className="truncate max-w-[160px] md:max-w-none text-sm md:text-lg" style={{ fontWeight: 700, color: "var(--hr-text)" }}>
             {pageTitle}
           </h1>
           <p className="text-xs hidden sm:block truncate" style={{ color: "var(--hr-text-light)" }}>
@@ -212,7 +212,7 @@ export function Header() {
         </div>
 
         {/* User badge */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl cursor-pointer transition-all"
+        <div className="flex items-center gap-2 px-2 md:px-3 py-1.5 rounded-xl cursor-pointer transition-all"
           style={{ border: "1px solid var(--hr-card-border-hard)", background: "var(--hr-card)" }}
           onClick={() => navigate("/settings")}>
           <img src={currentUser?.avatar} alt={currentUser?.firstName} className="w-7 h-7 rounded-full object-cover" />
@@ -220,7 +220,7 @@ export function Header() {
             <p className="text-xs" style={{ fontWeight: 600, color: "var(--hr-text)" }}>{currentUser?.firstName}</p>
             <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>{currentUser?.role}</p>
           </div>
-          <ChevronDown size={13} style={{ color: "var(--hr-text-light)" }} />
+          <ChevronDown size={13} className="hidden sm:block" style={{ color: "var(--hr-text-light)" }} />
         </div>
       </div>
     </header>

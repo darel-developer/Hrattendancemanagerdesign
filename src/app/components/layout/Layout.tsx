@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Outlet, Navigate } from "react-router";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { BottomNav } from "./BottomNav";
 import { useAuth } from "../../context/AuthContext";
 import { LayoutContext } from "../../context/LayoutContext";
 
@@ -27,19 +28,20 @@ export function Layout() {
         {/* Mobile overlay */}
         {mobileOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            className="fixed inset-0 z-40 backdrop-blur-sm bg-black/50 md:hidden"
             onClick={() => setMobileOpen(false)}
           />
         )}
         {/* Sidebar: fixed overlay on mobile, static on desktop */}
-        <div className={`fixed md:static inset-y-0 left-0 z-50 md:z-auto transition-transform duration-300 md:transform-none ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
+        <div className={`fixed md:static inset-y-0 left-0 z-50 md:z-auto transition-transform duration-300 md:transform-none w-72 md:w-auto ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
           <Sidebar />
         </div>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-y-auto p-3 md:p-6">
+          <main className="flex-1 overflow-y-auto p-3 md:p-6 pb-20 md:pb-6">
             <Outlet />
           </main>
+          <BottomNav />
         </div>
       </div>
     </LayoutContext.Provider>

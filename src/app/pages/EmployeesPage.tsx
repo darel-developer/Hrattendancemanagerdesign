@@ -1043,45 +1043,49 @@ export function EmployeesPage() {
   const statuses = ["Tous", "Actif", "Inactif", "En congé"];
 
   return (
-    <div className="space-y-5">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl flex-1 min-w-52"
+    <div className="space-y-4 md:space-y-5">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:flex-wrap items-stretch md:items-center gap-3">
+        {/* Search bar — full width on mobile */}
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl w-full md:flex-1 md:min-w-52"
           style={{ background: "var(--hr-card)", border: "1.5px solid var(--hr-card-border-hard)" }}>
           <Search size={15} style={{ color: "var(--hr-text-light)" }} />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un employé…"
             className="bg-transparent text-sm outline-none flex-1" style={{ color: "var(--hr-text)" }} />
           {search && <button onClick={() => setSearch("")}><X size={13} style={{ color: "var(--hr-text-light)" }} /></button>}
         </div>
-        <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}
-          className="px-3 py-2.5 rounded-xl text-sm outline-none"
-          style={{ background: "var(--hr-card)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}>
-          {depts.map((d) => <option key={d}>{d}</option>)}
-        </select>
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-3 py-2.5 rounded-xl text-sm outline-none"
-          style={{ background: "var(--hr-card)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}>
-          {statuses.map((s) => <option key={s}>{s}</option>)}
-        </select>
-        <div className="flex rounded-xl overflow-hidden" style={{ border: "1.5px solid var(--hr-card-border-hard)" }}>
-          {(["table", "grid"] as const).map((v) => (
-            <button key={v} onClick={() => setViewMode(v)} className="px-3 py-2 text-xs transition-all"
-              style={{ background: viewMode === v ? "#6366F1" : "var(--hr-card)", color: viewMode === v ? "white" : "var(--hr-text-muted)", fontWeight: viewMode === v ? 700 : 400 }}>
-              {v === "table" ? "Liste" : "Grille"}
-            </button>
-          ))}
+        {/* Filters row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}
+            className="px-3 py-2.5 rounded-xl text-sm outline-none flex-1 min-w-0"
+            style={{ background: "var(--hr-card)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}>
+            {depts.map((d) => <option key={d}>{d}</option>)}
+          </select>
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-3 py-2.5 rounded-xl text-sm outline-none flex-1 min-w-0"
+            style={{ background: "var(--hr-card)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}>
+            {statuses.map((s) => <option key={s}>{s}</option>)}
+          </select>
+          <div className="flex rounded-xl overflow-hidden" style={{ border: "1.5px solid var(--hr-card-border-hard)" }}>
+            {(["table", "grid"] as const).map((v) => (
+              <button key={v} onClick={() => setViewMode(v)} className="px-3 py-2 text-xs transition-all"
+                style={{ background: viewMode === v ? "#6366F1" : "var(--hr-card)", color: viewMode === v ? "white" : "var(--hr-text-muted)", fontWeight: viewMode === v ? 700 : 400 }}>
+                {v === "table" ? "Liste" : "Grille"}
+              </button>
+            ))}
+          </div>
+          <button onClick={exportCSV}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm transition-all"
+            style={{ background: "var(--hr-card)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600 }}>
+            <Download size={15} /><span className="hidden sm:inline">CSV</span>
+          </button>
+          <button onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm transition-all"
+            style={{ background: "var(--hr-card)", border: "1.5px solid #6366F1", color: "#6366F1", fontWeight: 600 }}>
+            <Upload size={15} /><span className="hidden sm:inline">Importer</span>
+          </button>
         </div>
-        <button onClick={exportCSV}
-          className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all"
-          style={{ background: "var(--hr-card)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600 }}>
-          <Download size={15} />CSV
-        </button>
-        <button onClick={() => setShowImportModal(true)}
-          className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all"
-          style={{ background: "var(--hr-card)", border: "1.5px solid #6366F1", color: "#6366F1", fontWeight: 600 }}>
-          <Upload size={15} />Importer
-        </button>
         <button onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm transition-all hover:opacity-90 w-full md:w-auto min-h-[44px]"
           style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}>
           <Plus size={15} />Nouvel employé
         </button>
@@ -1091,74 +1095,106 @@ export function EmployeesPage() {
         {filtered.length} employé{filtered.length > 1 ? "s" : ""} trouvé{filtered.length > 1 ? "s" : ""}
       </p>
 
-      {/* Table view */}
+      {/* Table view — hidden on mobile, shown on md+ */}
       {viewMode === "table" && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl overflow-hidden"
-          style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr style={{ background: "var(--hr-table-head)", borderBottom: "1px solid var(--hr-card-border)" }}>
-                  {["Employé", "Département", "Poste", "Rôle", "Contrat", "Salaire", "Statut", "Actions"].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 text-xs" style={{ color: "var(--hr-text-light)", fontWeight: 700, letterSpacing: "0.5px" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((emp, i) => (
-                  <motion.tr key={emp.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
-                    className="border-b transition-colors" style={{ borderColor: "var(--hr-card-border)" }}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <img src={emp.avatar} alt={emp.firstName} className="w-9 h-9 rounded-xl object-cover flex-shrink-0" />
-                        <div>
-                          <p className="text-sm" style={{ fontWeight: 600, color: "var(--hr-text)" }}>{emp.firstName} {emp.lastName}</p>
-                          <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>{emp.email}</p>
+        <>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hidden md:block rounded-2xl overflow-hidden"
+            style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr style={{ background: "var(--hr-table-head)", borderBottom: "1px solid var(--hr-card-border)" }}>
+                    {["Employé", "Département", "Poste", "Rôle", "Contrat", "Salaire", "Statut", "Actions"].map((h) => (
+                      <th key={h} className="text-left px-4 py-3 text-xs" style={{ color: "var(--hr-text-light)", fontWeight: 700, letterSpacing: "0.5px" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((emp, i) => (
+                    <motion.tr key={emp.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
+                      className="border-b transition-colors" style={{ borderColor: "var(--hr-card-border)" }}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <img src={emp.avatar} alt={emp.firstName} className="w-9 h-9 rounded-xl object-cover flex-shrink-0" />
+                          <div>
+                            <p className="text-sm" style={{ fontWeight: 600, color: "var(--hr-text)" }}>{emp.firstName} {emp.lastName}</p>
+                            <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>{emp.email}</p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {emp.department
-                        ? <span className="text-xs px-2 py-1 rounded-lg" style={{ background: "var(--hr-badge-bg)", color: "var(--hr-badge-text)" }}>{emp.department}</span>
-                        : <span className="text-xs" style={{ color: "var(--hr-text-light)", fontStyle: "italic" }}>—</span>}
-                    </td>
-                    <td className="px-4 py-3"><p className="text-xs" style={{ color: "var(--hr-text-sec)" }}>{emp.position}</p></td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-1 rounded-full" style={{ background: roleColor[emp.role]?.bg, color: roleColor[emp.role]?.text, fontWeight: 600 }}>{emp.role}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-1 rounded-full" style={{ background: contractColor[emp.contractType]?.bg, color: contractColor[emp.contractType]?.text, fontWeight: 600 }}>{emp.contractType}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm" style={{ fontWeight: 700, color: "#6366F1" }}>{emp.salary != null ? emp.salary.toLocaleString("fr-FR") : "—"} FCFA</p>
-                      <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>~{emp.salary != null ? (emp.salary / 22).toFixed(0) : "—"} FCFA/j</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-1 rounded-full flex items-center gap-1 w-fit"
-                        style={{ background: statusColor[emp.status]?.bg, color: statusColor[emp.status]?.text, fontWeight: 600 }}>
-                        <div className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor[emp.status]?.text }} />{emp.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => navigate(`/employees/${emp.id}`)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-indigo-50 transition-colors" title="Voir profil">
-                          <Eye size={13} style={{ color: "#6366F1" }} />
-                        </button>
-                        <button onClick={() => setSelectedEmpToEdit(emp)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-amber-50 transition-colors" title="Modifier">
-                          <Edit2 size={13} style={{ color: "#F59E0B" }} />
-                        </button>
-                        <button onClick={() => { if (window.confirm(`Supprimer ${emp.firstName} ${emp.lastName} ?`)) deleteEmployee(emp.id); }}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors" title="Supprimer">
-                          <Trash2 size={13} style={{ color: "#EF4444" }} />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                      <td className="px-4 py-3">
+                        {emp.department
+                          ? <span className="text-xs px-2 py-1 rounded-lg" style={{ background: "var(--hr-badge-bg)", color: "var(--hr-badge-text)" }}>{emp.department}</span>
+                          : <span className="text-xs" style={{ color: "var(--hr-text-light)", fontStyle: "italic" }}>—</span>}
+                      </td>
+                      <td className="px-4 py-3"><p className="text-xs" style={{ color: "var(--hr-text-sec)" }}>{emp.position}</p></td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs px-2 py-1 rounded-full" style={{ background: roleColor[emp.role]?.bg, color: roleColor[emp.role]?.text, fontWeight: 600 }}>{emp.role}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs px-2 py-1 rounded-full" style={{ background: contractColor[emp.contractType]?.bg, color: contractColor[emp.contractType]?.text, fontWeight: 600 }}>{emp.contractType}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm" style={{ fontWeight: 700, color: "#6366F1" }}>{emp.salary != null ? emp.salary.toLocaleString("fr-FR") : "—"} FCFA</p>
+                        <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>~{emp.salary != null ? (emp.salary / 22).toFixed(0) : "—"} FCFA/j</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs px-2 py-1 rounded-full flex items-center gap-1 w-fit"
+                          style={{ background: statusColor[emp.status]?.bg, color: statusColor[emp.status]?.text, fontWeight: 600 }}>
+                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor[emp.status]?.text }} />{emp.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => navigate(`/employees/${emp.id}`)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-indigo-50 transition-colors" title="Voir profil">
+                            <Eye size={13} style={{ color: "#6366F1" }} />
+                          </button>
+                          <button onClick={() => setSelectedEmpToEdit(emp)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-amber-50 transition-colors" title="Modifier">
+                            <Edit2 size={13} style={{ color: "#F59E0B" }} />
+                          </button>
+                          <button onClick={() => { if (window.confirm(`Supprimer ${emp.firstName} ${emp.lastName} ?`)) deleteEmployee(emp.id); }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors" title="Supprimer">
+                            <Trash2 size={13} style={{ color: "#EF4444" }} />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+
+          {/* Mobile card list — visible only on mobile */}
+          <div className="md:hidden space-y-3">
+            {filtered.map((emp, i) => (
+              <motion.div key={emp.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+                className="rounded-2xl p-4 flex items-center gap-3"
+                style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}
+              >
+                <img src={emp.avatar} alt={emp.firstName} className="w-11 h-11 rounded-xl object-cover flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate" style={{ fontWeight: 700, color: "var(--hr-text)" }}>{emp.firstName} {emp.lastName}</p>
+                  <p className="text-xs truncate" style={{ color: "var(--hr-text-light)" }}>{emp.position}</p>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {emp.department && (
+                      <span className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: "var(--hr-badge-bg)", color: "var(--hr-badge-text)" }}>{emp.department}</span>
+                    )}
+                    <span className="text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1"
+                      style={{ background: statusColor[emp.status]?.bg, color: statusColor[emp.status]?.text, fontWeight: 600 }}>
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor[emp.status]?.text }} />{emp.status}
+                    </span>
+                  </div>
+                </div>
+                <button onClick={() => navigate(`/employees/${emp.id}`)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs flex-shrink-0 min-h-[44px]"
+                  style={{ background: "rgba(99,102,241,0.1)", color: "#6366F1", fontWeight: 700 }}>
+                  <Eye size={13} />
+                </button>
+              </motion.div>
+            ))}
           </div>
-        </motion.div>
+        </>
       )}
 
       {/* Grid view */}

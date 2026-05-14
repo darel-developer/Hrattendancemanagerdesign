@@ -236,10 +236,10 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
           <div className="space-y-2">
             <button
               onClick={handleCheckIn}
-              className="w-full py-3.5 rounded-xl text-white transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-2"
-              style={{ background: "linear-gradient(135deg, #10B981, #059669)", fontWeight: 700 }}
+              className="w-full rounded-xl text-white transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-2 min-h-[64px]"
+              style={{ background: "linear-gradient(135deg, #10B981, #059669)", fontWeight: 700, padding: "1rem" }}
             >
-              <CheckCircle2 size={16} />
+              <CheckCircle2 size={18} />
               ✓ Pointer mon arrivée — {formatTime(time)}
             </button>
             <button
@@ -256,8 +256,8 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
         {checkInState === "in" && (
           <button
             onClick={() => void handleCheckOut()}
-            className="w-full py-3.5 rounded-xl text-white transition-all hover:opacity-90 active:scale-95"
-            style={{ background: "linear-gradient(135deg, #EF4444, #DC2626)", fontWeight: 700 }}
+            className="w-full rounded-xl text-white transition-all hover:opacity-90 active:scale-95 min-h-[64px] flex items-center justify-center"
+            style={{ background: "linear-gradient(135deg, #EF4444, #DC2626)", fontWeight: 700, padding: "1rem" }}
           >
             ✕ Pointer ma sortie — {formatTime(time)}
           </button>
@@ -285,14 +285,19 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
 
 // ─── Attendance Table (Admin/Manager view) ────────────────────────────────────
 function AttendanceTable({ records, employees }: { records: AttendanceRecord[]; employees: any[] }) {
+  if (records.length === 0) {
+    return (
+      <div className="rounded-2xl py-16 text-center" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
+        <Clock size={40} style={{ color: "var(--hr-text-light)" }} className="mx-auto mb-3" />
+        <p style={{ color: "var(--hr-text-muted)" }}>Aucun enregistrement pour ce jour</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
-      {records.length === 0 ? (
-        <div className="py-16 text-center">
-          <Clock size={40} style={{ color: "var(--hr-text-light)" }} className="mx-auto mb-3" />
-          <p style={{ color: "var(--hr-text-muted)" }}>Aucun enregistrement pour ce jour</p>
-        </div>
-      ) : (
+    <>
+      {/* Desktop table */}
+      <div className="hidden md:block rounded-2xl overflow-hidden" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -356,8 +361,49 @@ function AttendanceTable({ records, employees }: { records: AttendanceRecord[]; 
             </tbody>
           </table>
         </div>
-      )}
-    </div>
+      </div>
+
+      {/* Mobile card list */}
+      <div className="md:hidden space-y-3">
+        {records.map((r, i) => {
+          const emp = employees.find((e) => e.id === r.employeeId);
+          if (!emp) return null;
+          const cfg = statusConfig[r.status];
+          return (
+            <motion.div key={r.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+              className="rounded-2xl p-4"
+              style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <img src={emp.avatar} alt={emp.firstName} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate" style={{ fontWeight: 700, color: "var(--hr-text)" }}>{emp.firstName} {emp.lastName}</p>
+                  <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>{emp.department}</p>
+                </div>
+                <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full flex-shrink-0"
+                  style={{ background: cfg?.bg, color: cfg?.text, fontWeight: 600 }}>
+                  {cfg?.icon}{r.status}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl p-2 text-center" style={{ background: "var(--hr-hover)" }}>
+                  <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>Entrée</p>
+                  <p className="text-sm" style={{ fontWeight: 700, color: r.checkIn ? "#10B981" : "var(--hr-text-muted)" }}>{r.checkIn ?? "—"}</p>
+                </div>
+                <div className="rounded-xl p-2 text-center" style={{ background: "var(--hr-hover)" }}>
+                  <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>Sortie</p>
+                  <p className="text-sm" style={{ fontWeight: 700, color: r.checkOut ? "#EF4444" : "var(--hr-text-muted)" }}>{r.checkOut ?? "—"}</p>
+                </div>
+                <div className="rounded-xl p-2 text-center" style={{ background: "var(--hr-hover)" }}>
+                  <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>Heures</p>
+                  <p className="text-sm" style={{ fontWeight: 700, color: "#6366F1" }}>{r.hoursWorked ? `${r.hoursWorked}h` : "—"}</p>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -419,8 +465,8 @@ export function AttendancePage() {
     const history = myRecords.slice(0, 10);
 
     return (
-      <div className="space-y-5">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="space-y-4 md:space-y-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
           <PersonalCheckIn
             employeeId={currentUser?.id ?? ""}
             todayRecord={attendanceRecords.find((r) => r.employeeId === currentUser?.id && r.date === new Date().toISOString().split("T")[0])}
@@ -511,7 +557,7 @@ export function AttendancePage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 md:space-y-5">
       {/* Manager personal check-in */}
       {role === "Manager" && (
         <PersonalCheckIn
@@ -522,7 +568,7 @@ export function AttendancePage() {
       )}
 
       {/* Daily summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           className="rounded-2xl p-5"
           style={{ background: "linear-gradient(135deg, #0B1437, #1E1B4B)", border: "1px solid rgba(99,102,241,0.2)" }}
@@ -605,11 +651,11 @@ export function AttendancePage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-1" style={{ scrollbarWidth: "none" }}>
           {statuses.map((s) => (
             <button key={s} onClick={() => setFilterStatus(s)}
-              className="px-3 py-1.5 rounded-xl text-xs transition-all"
+              className="px-3 py-1.5 rounded-xl text-xs transition-all flex-shrink-0"
               style={{
                 background: filterStatus === s ? (s === "Tous" ? "#6366F1" : statusConfig[s]?.bg ?? "#6366F1") : "var(--hr-card)",
                 color: filterStatus === s ? (s === "Tous" ? "white" : statusConfig[s]?.text ?? "white") : "var(--hr-text-muted)",
@@ -622,11 +668,11 @@ export function AttendancePage() {
             </button>
           ))}
         </div>
-        <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all"
+        <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm transition-all flex-shrink-0"
           style={{ border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600, background: "var(--hr-card)" }}
         >
           <Download size={14} />
-          Exporter CSV
+          <span className="hidden sm:inline">Exporter CSV</span>
         </button>
       </div>
 

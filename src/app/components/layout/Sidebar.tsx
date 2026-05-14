@@ -18,9 +18,11 @@ import {
   FileText,
   LayoutGrid,
   Building2,
+  X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useLayout } from "../../context/LayoutContext";
 import { notificationsApi, leavesApi } from "../../services/api";
 import { TranslationKey } from "../../data/translations";
 import { AppLogo } from "../AppLogo";
@@ -51,6 +53,7 @@ export function Sidebar() {
   const [dynamicBadges, setDynamicBadges] = useState<Record<string, number>>({});
   const { currentUser, logout, employees } = useAuth();
   const { t } = useTheme();
+  const { setMobileOpen } = useLayout();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -114,7 +117,7 @@ export function Sidebar() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.2 }}
-              className="overflow-hidden whitespace-nowrap"
+              className="overflow-hidden whitespace-nowrap flex-1"
             >
               <p className="text-white text-sm" style={{ fontWeight: 700, letterSpacing: "-0.3px" }}>
                 HR Manager
@@ -125,6 +128,15 @@ export function Sidebar() {
             </motion.div>
           )}
         </AnimatePresence>
+        {/* Close button - only on mobile */}
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ml-auto"
+          style={{ background: "rgba(255,255,255,0.08)" }}
+          aria-label="Fermer le menu"
+        >
+          <X size={16} className="text-white" />
+        </button>
       </div>
 
       {/* Collapse toggle */}
