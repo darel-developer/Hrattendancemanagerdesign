@@ -1,4 +1,4 @@
-const CACHE_NAME = "hr-manager-v3";
+const CACHE_NAME = "hr-manager-v4";
 const STATIC_ASSETS = ["/", "/index.html"];
 
 self.addEventListener("install", (event) => {
@@ -46,4 +46,16 @@ self.addEventListener("fetch", (event) => {
       });
     })
   );
+});
+
+// Background Sync: when the device comes back online, tell all open clients
+// to process their pending attendance queue
+self.addEventListener("sync", (event) => {
+  if (event.tag === "attendance-sync") {
+    event.waitUntil(
+      self.clients.matchAll({ includeUncontrolled: true, type: "window" }).then((clients) => {
+        clients.forEach((client) => client.postMessage({ type: "PROCESS_QUEUE" }));
+      })
+    );
+  }
 });

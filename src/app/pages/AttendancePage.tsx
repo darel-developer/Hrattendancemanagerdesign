@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   CheckCircle2, XCircle, Timer, MonitorSmartphone, CalendarDays,
-  Clock, ChevronLeft, ChevronRight, Download, Edit3, AlertCircle, X, MapPin
+  Clock, ChevronLeft, ChevronRight, Download, Edit3, AlertCircle, X, MapPin,
+  WifiOff, Loader2,
 } from "lucide-react";
 import { AttendanceRecord } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
 import { attendanceApi } from "../services/api";
+import { getQueue, enqueue, dequeue } from "../utils/attendanceQueue";
 
 const statusConfig: Record<string, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
   "Présent": { bg: "#D1FAE5", text: "#16A34A", icon: <CheckCircle2 size={13} />, label: "Présent" },
@@ -96,6 +98,62 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
   const geoRequired = currentCompany?.latitude != null && currentCompany?.longitude != null;
   const canCheckIn = !geoRequired || workMode === "télétravail" || geoStatus === "allowed";
 
+  // ── Offline queue ──────────────────────────────────────────────────────────
+  const lastSyncedId = useRef<string | null>(null);
+  const [pendingCount, setPendingCount] = useState(() => getQueue(employeeId).length);
+  const [syncing, setSyncing] = useState(false);
+
+  const processSyncQueue = useCallback(async () => {
+    const pending = getQueue(employeeId);
+    if (pending.length === 0) return;
+    setSyncing(true);
+    for (const action of pending) {
+      try {
+        if (action.type === "checkIn") {
+          const created = await attendanceApi.create({
+            employeeId: action.employeeId,
+            date: action.date,
+            checkIn: action.checkIn!,
+            status: action.status ?? "Présent",
+            note: action.note ?? "",
+          });
+          lastSyncedId.current = created.id;
+          setSavedRecordId(created.id);
+          setRecordedStatus(created.status ?? action.status ?? "Présent");
+          dequeue(action.localId);
+        } else if (action.type === "checkOut") {
+          const id = action.recordId ?? lastSyncedId.current;
+          if (!id) { dequeue(action.localId); continue; }
+          await attendanceApi.update(id, {
+            checkOut: action.checkOut!,
+            ...(action.hoursWorked != null ? { hoursWorked: action.hoursWorked } : {}),
+          });
+          dequeue(action.localId);
+        }
+      } catch {
+        break; // Still offline or server error — stop and keep remaining in queue
+      }
+    }
+    setPendingCount(getQueue(employeeId).length);
+    setSyncing(false);
+    onRefresh?.();
+  }, [employeeId, onRefresh]);
+
+  useEffect(() => {
+    // Try to sync immediately if online and queue is not empty
+    if (navigator.onLine && getQueue(employeeId).length > 0) void processSyncQueue();
+    const onOnline = () => void processSyncQueue();
+    window.addEventListener("online", onOnline);
+    const onSwMessage = (e: MessageEvent) => {
+      if ((e.data as { type?: string })?.type === "PROCESS_QUEUE") void processSyncQueue();
+    };
+    if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", onSwMessage);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      if ("serviceWorker" in navigator) navigator.serviceWorker.removeEventListener("message", onSwMessage);
+    };
+  }, [processSyncQueue, employeeId]);
+
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
@@ -145,8 +203,11 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
       setSavedRecordId(created.id);
       setRecordedStatus(created.status ?? status);
       onRefresh?.();
-    } catch (err) {
-      console.error("Erreur pointage entrée", err);
+    } catch {
+      // Network error — save optimistically and queue for later sync
+      enqueue({ type: "checkIn", employeeId, date: today, checkIn: recordedTime, status, note: note || "" });
+      setPendingCount((c) => c + 1);
+      setRecordedStatus(status);
     }
     setCheckInTime(recordedTime);
     setCheckInState("in");
@@ -156,20 +217,28 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
   const handleCheckOut = async () => {
     const outTime = formatTime(time);
     const id = savedRecordId || todayRecord?.id;
+    const [ch, cm] = checkInTime.split(":").map(Number);
+    const [oh, om] = outTime.split(":").map(Number);
+    const diffMinutes = oh * 60 + om - (ch * 60 + cm);
+    const hoursWorked = diffMinutes > 0 ? Math.round((diffMinutes / 60) * 100) / 100 : null;
+    const today = new Date().toISOString().split("T")[0];
     if (id) {
-      const [ch, cm] = checkInTime.split(":").map(Number);
-      const [oh, om] = outTime.split(":").map(Number);
-      const diffMinutes = oh * 60 + om - (ch * 60 + cm);
-      const hoursWorked = diffMinutes > 0 ? Math.round((diffMinutes / 60) * 100) / 100 : null;
       try {
         await attendanceApi.update(id, {
           checkOut: outTime,
           ...(hoursWorked !== null ? { hoursWorked } : {}),
         });
         onRefresh?.();
-      } catch (err) {
-        console.error("Erreur pointage sortie", err);
+      } catch {
+        // Network error — queue with known record ID
+        enqueue({ type: "checkOut", employeeId, date: today, checkOut: outTime, hoursWorked, recordId: id });
+        setPendingCount((c) => c + 1);
       }
+    } else {
+      // id unknown — check-in was done offline, queue without recordId
+      // processSyncQueue will resolve it using lastSyncedId after syncing the checkIn
+      enqueue({ type: "checkOut", employeeId, date: today, checkOut: outTime, hoursWorked });
+      setPendingCount((c) => c + 1);
     }
     setCheckOutTime(outTime);
     setCheckInState("out");
@@ -282,6 +351,36 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Offline sync indicator */}
+        {pendingCount > 0 && (
+          <div
+            className="flex items-center justify-between p-3 rounded-xl"
+            style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)" }}
+          >
+            <div className="flex items-center gap-2">
+              {syncing ? (
+                <Loader2 size={13} className="animate-spin" style={{ color: "#F59E0B", flexShrink: 0 }} />
+              ) : (
+                <WifiOff size={13} style={{ color: "#F59E0B", flexShrink: 0 }} />
+              )}
+              <span className="text-xs" style={{ color: "#F59E0B", fontWeight: 600 }}>
+                {syncing
+                  ? "Synchronisation en cours…"
+                  : `${pendingCount} pointage${pendingCount > 1 ? "s" : ""} hors-ligne en attente`}
+              </span>
+            </div>
+            {!syncing && (
+              <button
+                onClick={() => void processSyncQueue()}
+                className="text-xs px-2 py-0.5 rounded-lg"
+                style={{ color: "#F59E0B", background: "rgba(245,158,11,0.15)" }}
+              >
+                ↺ Sync
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Geo status indicator — présentiel only */}
         {geoRequired && workMode === "présentiel" && checkInState === "none" && (
