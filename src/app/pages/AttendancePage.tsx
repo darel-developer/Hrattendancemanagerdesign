@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   CheckCircle2, XCircle, Timer, MonitorSmartphone, CalendarDays,
-  Clock, ChevronLeft, ChevronRight, Download, Edit3, AlertCircle, X
+  Clock, ChevronLeft, ChevronRight, Download, Edit3, AlertCircle, X, MapPin
 } from "lucide-react";
 import { AttendanceRecord } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
@@ -15,6 +15,50 @@ const statusConfig: Record<string, { bg: string; text: string; icon: React.React
   "Congé": { bg: "#EDE9FE", text: "#7C3AED", icon: <CalendarDays size={13} />, label: "Congé" },
   "Télétravail": { bg: "#CCFBF1", text: "#0D9488", icon: <MonitorSmartphone size={13} />, label: "Télétravail" },
 };
+
+// ─── Geolocation hook for attendance check-in ───────────────────────────────
+type GeoStatus = "idle" | "checking" | "allowed" | "denied" | "error";
+
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371000, r = (v: number) => (v * Math.PI) / 180;
+  const dLat = r(lat2 - lat1), dLon = r(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function useAttendanceGeo(
+  companyLat?: number | null,
+  companyLng?: number | null,
+  geoRadius = 100
+): { geoStatus: GeoStatus; distance: number | null; retry: () => void } {
+  const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
+  const [distance, setDistance] = useState<number | null>(null);
+
+  const check = useCallback(() => {
+    if (companyLat == null || companyLng == null) {
+      setGeoStatus("allowed");
+      return;
+    }
+    setGeoStatus("checking");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const d = Math.round(haversineMeters(pos.coords.latitude, pos.coords.longitude, companyLat, companyLng));
+        setDistance(d);
+        setGeoStatus(d <= geoRadius ? "allowed" : "denied");
+      },
+      () => setGeoStatus("error"),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  }, [companyLat, companyLng, geoRadius]);
+
+  useEffect(() => {
+    check();
+    const id = setInterval(check, 30000);
+    return () => clearInterval(id);
+  }, [check]);
+
+  return { geoStatus, distance, retry: check };
+}
 
 function computeCheckInStatus(
   checkInTime: string,
@@ -43,6 +87,14 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
   const [workMode, setWorkMode] = useState<"présentiel" | "télétravail">("présentiel");
   const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
   const [recordedStatus, setRecordedStatus] = useState<string>("");
+
+  const { geoStatus, distance, retry: retryGeo } = useAttendanceGeo(
+    currentCompany?.latitude,
+    currentCompany?.longitude,
+    currentCompany?.geoRadius ?? 100
+  );
+  const geoRequired = currentCompany?.latitude != null && currentCompany?.longitude != null;
+  const canCheckIn = !geoRequired || workMode === "télétravail" || geoStatus === "allowed";
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -231,16 +283,90 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
           )}
         </AnimatePresence>
 
+        {/* Geo status indicator — présentiel only */}
+        {geoRequired && workMode === "présentiel" && checkInState === "none" && (
+          <div
+            className="flex items-center justify-between p-3 rounded-xl"
+            style={{
+              background: geoStatus === "allowed"
+                ? "rgba(16,185,129,0.15)"
+                : geoStatus === "denied"
+                  ? "rgba(239,68,68,0.12)"
+                  : "rgba(99,102,241,0.1)",
+              border: `1px solid ${
+                geoStatus === "allowed"
+                  ? "rgba(16,185,129,0.3)"
+                  : geoStatus === "denied"
+                    ? "rgba(239,68,68,0.3)"
+                    : "rgba(99,102,241,0.2)"
+              }`,
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <MapPin
+                size={13}
+                style={{
+                  color: geoStatus === "allowed" ? "#10B981" : geoStatus === "denied" ? "#EF4444" : "#6366F1",
+                  flexShrink: 0,
+                }}
+              />
+              <span className="text-xs text-white" style={{ fontWeight: 600 }}>
+                {geoStatus === "checking"
+                  ? "Localisation en cours…"
+                  : geoStatus === "allowed"
+                    ? `Sur site ✓${distance != null ? ` · ${distance} m` : ""}`
+                    : geoStatus === "denied"
+                      ? `Hors zone · ${distance} m`
+                      : geoStatus === "error"
+                        ? "GPS indisponible"
+                        : "Vérification…"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {geoStatus === "denied" && (
+                <span className="text-xs" style={{ color: "#EF4444" }}>
+                  max {currentCompany?.geoRadius ?? 100} m
+                </span>
+              )}
+              {(geoStatus === "denied" || geoStatus === "error") && (
+                <button
+                  onClick={retryGeo}
+                  className="text-xs px-2 py-0.5 rounded-lg"
+                  style={{ color: "#6366F1", background: "rgba(99,102,241,0.2)" }}
+                >
+                  ↺
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Action buttons */}
         {checkInState === "none" && (
           <div className="space-y-2">
             <button
-              onClick={handleCheckIn}
-              className="w-full rounded-xl text-white transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-2 min-h-[64px]"
-              style={{ background: "linear-gradient(135deg, #10B981, #059669)", fontWeight: 700, padding: "1rem" }}
+              onClick={canCheckIn ? handleCheckIn : undefined}
+              disabled={!canCheckIn}
+              className="w-full rounded-xl text-white transition-all active:scale-95 flex items-center justify-center gap-2 min-h-[64px]"
+              style={{
+                background: canCheckIn
+                  ? "linear-gradient(135deg, #10B981, #059669)"
+                  : "rgba(255,255,255,0.08)",
+                fontWeight: 700,
+                padding: "1rem",
+                opacity: canCheckIn ? 1 : 0.65,
+                cursor: canCheckIn ? "pointer" : "not-allowed",
+                border: canCheckIn ? "none" : "1px solid rgba(255,255,255,0.15)",
+              }}
             >
               <CheckCircle2 size={18} />
-              ✓ Pointer mon arrivée — {formatTime(time)}
+              {canCheckIn
+                ? `✓ Pointer mon arrivée — ${formatTime(time)}`
+                : geoStatus === "denied"
+                  ? `📍 Hors zone · ${distance} m / ${currentCompany?.geoRadius ?? 100} m`
+                  : geoStatus === "error"
+                    ? "GPS introuvable — touchez ↺ pour réessayer"
+                    : "Localisation en cours…"}
             </button>
             <button
               onClick={() => setShowManualEntry(!showManualEntry)}
