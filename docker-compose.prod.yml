@@ -1,0 +1,72 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${DB_USER:?DB_USER required}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD required}"
+      POSTGRES_DB: "${DB_NAME:-hr_attendance_db}"
+    volumes:
+      - hrmgr_postgres_data:/var/lib/postgresql/data
+      - ./deploy_pg.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - hrmgr-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: "${DB_USER}"
+      DB_PASSWORD: "${DB_PASSWORD}"
+      DB_NAME: "${DB_NAME:-hr_attendance_db}"
+      DB_SSL: "false"
+      PORT: "3000"
+      NODE_ENV: "production"
+      LOG_LEVEL: "${LOG_LEVEL:-warn}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET required}"
+      JWT_EXPIRES_IN: "${JWT_EXPIRES_IN:-8h}"
+      SUPER_ADMIN_PASSWORD: "${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD required}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-https://hrmanagerportal.duckdns.org}"
+      AUTO_BACKUP: "false"
+    ports:
+      - "127.0.0.1:8085:3000"
+    networks:
+      - hrmgr-internal
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "${VITE_API_URL:-https://api.hrmanagerportal.duckdns.org}"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8086:80"
+    networks:
+      - hrmgr-internal
+    depends_on:
+      - backend
+
+volumes:
+  hrmgr_postgres_data:
+
+networks:
+  hrmgr-internal:
+    driver: bridge

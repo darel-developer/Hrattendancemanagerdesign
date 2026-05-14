@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.github
+server
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db
