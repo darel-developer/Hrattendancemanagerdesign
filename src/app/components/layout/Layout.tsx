@@ -10,9 +10,7 @@ export function Layout() {
   const { isAuthenticated, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Request geolocation permission silently in the background at app start.
-  // The browser shows its native permission prompt without blocking the UI.
-  // Subsequent calls in AttendancePage / KioskPage will reuse the granted permission.
+  // Silent background geolocation permission request at app start.
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -21,6 +19,19 @@ export function Layout() {
         { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
       );
     }
+  }, []);
+
+  // Reload the page when a new service worker activates so users always
+  // run the latest version of the app.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onSwMessage = (e: MessageEvent) => {
+      if ((e.data as { type?: string })?.type === "SW_UPDATED") {
+        window.location.reload();
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onSwMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onSwMessage);
   }, []);
 
   if (loading) {
