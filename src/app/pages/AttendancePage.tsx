@@ -37,11 +37,26 @@ function useAttendanceGeo(
   const [distance, setDistance] = useState<number | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  const check = useCallback(() => {
+  useEffect(() => {
     if (companyLat == null || companyLng == null) {
       setGeoStatus("allowed");
       return;
     }
+    setGeoStatus("checking");
+    const opts: PositionOptions = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
+    const onSuccess = (pos: GeolocationPosition) => {
+      const { latitude, longitude } = pos.coords;
+      setCoords({ lat: latitude, lng: longitude });
+      const d = Math.round(haversineMeters(latitude, longitude, companyLat, companyLng));
+      setDistance(d);
+      setGeoStatus(d <= geoRadius ? "allowed" : "denied");
+    };
+    const watchId = navigator.geolocation.watchPosition(onSuccess, () => setGeoStatus("error"), opts);
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [companyLat, companyLng, geoRadius]);
+
+  const retry = useCallback(() => {
+    if (companyLat == null || companyLng == null) return;
     setGeoStatus("checking");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -56,13 +71,7 @@ function useAttendanceGeo(
     );
   }, [companyLat, companyLng, geoRadius]);
 
-  useEffect(() => {
-    check();
-    const id = setInterval(check, 30000);
-    return () => clearInterval(id);
-  }, [check]);
-
-  return { geoStatus, distance, coords, retry: check };
+  return { geoStatus, distance, coords, retry };
 }
 
 function computeCheckInStatus(
