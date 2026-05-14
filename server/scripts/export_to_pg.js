@@ -24,6 +24,11 @@ function sqlVal(v) {
   if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
   if (typeof v === 'number') return String(v);
   const s = fix(String(v));
+  if (/[\n\r\t]/.test(s)) {
+    const esc = s.replace(/\\/g, '\\\\').replace(/'/g, "''")
+      .replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+    return `E'${esc}'`;
+  }
   return `'${s.replace(/'/g, "''")}'`;
 }
 
@@ -195,15 +200,15 @@ CREATE TABLE IF NOT EXISTS departments (
 
   // ── Données ───────────────────────────────────────────────────────────────
   const tables = [
-    { name: 'companies',           cols: ['id','name','sector','address','hr_email','work_start','late_tolerance','created_at','latitude','longitude','geo_radius'] },
-    { name: 'employees',           cols: ['id','company_id','first_name','last_name','email','phone','avatar','role','department','position','contract_type','start_date','salary','status','manager_id','address','birth_date','leave_balance','leave_used','password_hash','pin','created_at','work_days'] },
-    { name: 'attendance_records',  cols: ['id','employee_id','date','check_in','check_out','status','hours_worked','note','created_at'] },
-    { name: 'leave_requests',      cols: ['id','employee_id','type','start_date','end_date','days','reason','status','request_date','reviewed_by','review_date','comment','created_at'] },
-    { name: 'notifications',       cols: ['id','type','title','message','date','is_read','employee_id'] },
-    { name: 'departments',         cols: ['id','company_id','name','created_at'] },
+    { name: 'companies',           cols: ['id','name','sector','address','hr_email','work_start','late_tolerance','created_at','latitude','longitude','geo_radius'], bools: [] },
+    { name: 'employees',           cols: ['id','company_id','first_name','last_name','email','phone','avatar','role','department','position','contract_type','start_date','salary','status','manager_id','address','birth_date','leave_balance','leave_used','password_hash','pin','created_at','work_days'], bools: [] },
+    { name: 'attendance_records',  cols: ['id','employee_id','date','check_in','check_out','status','hours_worked','note','created_at'], bools: [] },
+    { name: 'leave_requests',      cols: ['id','employee_id','type','start_date','end_date','days','reason','status','request_date','reviewed_by','review_date','comment','created_at'], bools: [] },
+    { name: 'notifications',       cols: ['id','type','title','message','date','is_read','employee_id'], bools: ['is_read'] },
+    { name: 'departments',         cols: ['id','company_id','name','created_at'], bools: [] },
   ];
 
-  for (const { name, cols } of tables) {
+  for (const { name, cols, bools } of tables) {
     const [rows] = await conn.query(`SELECT * FROM \`${name}\``);
     if (!rows.length) {
       lines.push(`-- ${name}: aucune donnée`);
@@ -211,7 +216,10 @@ CREATE TABLE IF NOT EXISTS departments (
     }
     lines.push(`-- ${name} (${rows.length} lignes)`);
     for (const row of rows) {
-      const vals = cols.map(c => sqlVal(row[c]));
+      const vals = cols.map(c => {
+        if (bools.includes(c)) return (row[c] === 1 || row[c] === true || row[c] === '1') ? 'TRUE' : 'FALSE';
+        return sqlVal(row[c]);
+      });
       lines.push(`INSERT INTO ${name} (${cols.join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT DO NOTHING;`);
     }
     lines.push('');
