@@ -800,7 +800,7 @@ interface EditEmployeeModalProps {
   onCreateDept: (name: string) => Promise<void>;
 }
 
-function EditEmployeeModal({ emp, onClose, onSave, allEmployees, departments, onCreateDept }: EditEmployeeModalProps) {
+export function EditEmployeeModal({ emp, onClose, onSave, allEmployees, departments, onCreateDept }: EditEmployeeModalProps) {
   const [form, setForm] = useState({
     firstName: emp.firstName, lastName: emp.lastName, email: emp.email,
     phone: emp.phone || "", position: emp.position || "",

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, Briefcase, Award,
   Clock, CalendarDays, TrendingUp, Edit2, Download, MoreVertical,
@@ -8,15 +8,18 @@ import {
 } from "lucide-react";
 import { AttendanceRecord, LeaveRequest } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
-import { attendanceApi, leavesApi } from "../services/api";
+import { attendanceApi, leavesApi, departmentsApi } from "../services/api";
+import { EditEmployeeModal } from "./EmployeesPage";
 
 export function EmployeeDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { employees } = useAuth();
+  const { employees, updateEmployee, currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<"overview" | "attendance" | "leaves">("overview");
   const [empRecords, setEmpRecords] = useState<AttendanceRecord[]>([]);
   const [empLeaves, setEmpLeaves] = useState<LeaveRequest[]>([]);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [departments, setDepartments] = useState<string[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -30,6 +33,13 @@ export function EmployeeDetailPage() {
       })
       .catch(console.error);
   }, [id]);
+
+  useEffect(() => {
+    if (!currentUser?.companyId) return;
+    departmentsApi.getAll(currentUser.companyId)
+      .then((list) => setDepartments(list.map((d: any) => d.name)))
+      .catch(() => {});
+  }, [currentUser?.companyId]);
 
   const emp = employees.find((e) => e.id === id);
   if (!emp) {
@@ -122,6 +132,7 @@ export function EmployeeDetailPage() {
               Exporter
             </button>
             <button
+              onClick={() => setShowEditModal(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm transition-all hover:opacity-90"
               style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", fontWeight: 700 }}
             >
@@ -198,6 +209,27 @@ export function EmployeeDetailPage() {
       </div>
 
       {/* Tab content */}
+      <AnimatePresence>
+        {showEditModal && emp && (
+          <EditEmployeeModal
+            emp={emp}
+            onClose={() => setShowEditModal(false)}
+            onSave={async (empId, updates) => {
+              await updateEmployee(empId, updates);
+              setShowEditModal(false);
+            }}
+            allEmployees={employees}
+            departments={departments}
+            onCreateDept={async (name) => {
+              if (currentUser?.companyId) {
+                await departmentsApi.create({ name, companyId: currentUser.companyId });
+                setDepartments((prev) => [...prev, name].sort((a, b) => a.localeCompare(b, "fr")));
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       <AnimatedTab key={activeTab}>
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
