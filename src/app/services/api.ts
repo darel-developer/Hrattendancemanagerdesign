@@ -117,7 +117,7 @@ export const reportsApi = {
     request<Report[]>(`/reports?recipientId=${recipientId}`),
   getSent: (senderId: string) =>
     request<Report[]>(`/reports?senderId=${senderId}`),
-  create: (report: { senderId: string; recipientId?: string; title: string; type: string; content: string }) =>
+  create: (report: { senderId: string; recipientId?: string; title: string; type: string; content: string; attachmentName?: string; attachmentData?: string }) =>
     request<Report>("/reports", { method: "POST", body: JSON.stringify(report) }),
   markRead: (id: string) =>
     request<{ success: boolean }>(`/reports/${id}/read`, { method: "PUT" }),

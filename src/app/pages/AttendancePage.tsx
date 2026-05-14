@@ -42,6 +42,7 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
   const [note, setNote] = useState("");
   const [workMode, setWorkMode] = useState<"présentiel" | "télétravail">("présentiel");
   const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
+  const [recordedStatus, setRecordedStatus] = useState<string>("");
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -52,6 +53,7 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
   useEffect(() => {
     if (!todayRecord) return;
     setSavedRecordId(todayRecord.id);
+    if (todayRecord.status) setRecordedStatus(todayRecord.status);
     if (todayRecord.checkOut) {
       setCheckInTime(todayRecord.checkIn ?? "");
       setCheckOutTime(todayRecord.checkOut);
@@ -89,6 +91,7 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
         note: note || "",
       });
       setSavedRecordId(created.id);
+      setRecordedStatus(created.status ?? status);
       onRefresh?.();
     } catch (err) {
       console.error("Erreur pointage entrée", err);
@@ -102,8 +105,15 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
     const outTime = formatTime(time);
     const id = savedRecordId || todayRecord?.id;
     if (id) {
+      const [ch, cm] = checkInTime.split(":").map(Number);
+      const [oh, om] = outTime.split(":").map(Number);
+      const diffMinutes = oh * 60 + om - (ch * 60 + cm);
+      const hoursWorked = diffMinutes > 0 ? Math.round((diffMinutes / 60) * 100) / 100 : null;
       try {
-        await attendanceApi.update(id, { checkOut: outTime });
+        await attendanceApi.update(id, {
+          checkOut: outTime,
+          ...(hoursWorked !== null ? { hoursWorked } : {}),
+        });
         onRefresh?.();
       } catch (err) {
         console.error("Erreur pointage sortie", err);
@@ -174,6 +184,17 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
                 <span style={{ color: "#EF4444", fontWeight: 800 }}>{checkOutTime}</span>
               </div>
             )}
+            {recordedStatus && (() => {
+              const cfg = statusConfig[recordedStatus];
+              return cfg ? (
+                <div className="flex items-center justify-between p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.05)" }}>
+                  <span className="text-xs" style={{ color: "#94A3B8" }}>Statut</span>
+                  <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full" style={{ background: cfg.bg, color: cfg.text, fontWeight: 700 }}>
+                    {cfg.icon}{cfg.label}
+                  </span>
+                </div>
+              ) : null;
+            })()}
           </div>
         )}
 

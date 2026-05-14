@@ -5,18 +5,23 @@ const db = require('../db');
 async function ensureTable() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS reports (
-      id           VARCHAR(20) PRIMARY KEY,
-      sender_id    VARCHAR(10) NOT NULL,
-      recipient_id VARCHAR(10) NULL,
-      title        VARCHAR(255) NOT NULL,
-      type         VARCHAR(100) NOT NULL DEFAULT 'Rapport',
-      content      TEXT NOT NULL,
-      created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      is_read      BOOLEAN DEFAULT FALSE,
+      id              VARCHAR(20) PRIMARY KEY,
+      sender_id       VARCHAR(10) NOT NULL,
+      recipient_id    VARCHAR(10) NULL,
+      title           VARCHAR(255) NOT NULL,
+      type            VARCHAR(100) NOT NULL DEFAULT 'Rapport',
+      content         TEXT NOT NULL,
+      created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      is_read         BOOLEAN DEFAULT FALSE,
+      attachment_name VARCHAR(255) NULL,
+      attachment_data LONGTEXT NULL,
       CONSTRAINT fk_rpt_sender    FOREIGN KEY (sender_id)    REFERENCES employees(id) ON DELETE CASCADE,
       CONSTRAINT fk_rpt_recipient FOREIGN KEY (recipient_id) REFERENCES employees(id) ON DELETE SET NULL
     ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `);
+  // Migration pour tables existantes
+  await db.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS attachment_name VARCHAR(255) NULL`);
+  await db.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS attachment_data LONGTEXT NULL`);
 }
 
 function mapReport(row) {
@@ -29,6 +34,8 @@ function mapReport(row) {
     content: row.content,
     createdAt: row.created_at ? String(row.created_at).replace(' ', 'T') : null,
     isRead: row.is_read === 1 || row.is_read === true || row.is_read === '1',
+    attachmentName: row.attachment_name || null,
+    attachmentData: row.attachment_data || null,
   };
 }
 
@@ -52,9 +59,10 @@ router.post('/', async (req, res) => {
     const r = req.body;
     const id = `RPT${Date.now().toString(36).slice(-7).toUpperCase()}`;
     await db.query(
-      `INSERT INTO reports (id, sender_id, recipient_id, title, type, content)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, r.senderId, r.recipientId || null, r.title, r.type || 'Rapport', r.content]
+      `INSERT INTO reports (id, sender_id, recipient_id, title, type, content, attachment_name, attachment_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, r.senderId, r.recipientId || null, r.title, r.type || 'Rapport', r.content,
+       r.attachmentName || null, r.attachmentData || null]
     );
     const [rows] = await db.query('SELECT * FROM reports WHERE id = ?', [id]);
     res.status(201).json(mapReport(rows[0]));

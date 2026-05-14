@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Download, FileText, TrendingUp, Users, Clock, CalendarDays,
-  Send, X, CheckCircle2, Edit3, ChevronRight, Printer
+  Send, X, CheckCircle2, Edit3, ChevronRight, Printer, Paperclip
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -314,7 +314,6 @@ function ReadReportModal({ report, sender, onClose, onMarkRead }: {
   onClose: () => void;
   onMarkRead: () => void;
 }) {
-  const [showFmt, setShowFmt] = useState(false);
   const senderName = sender ? `${sender.firstName} ${sender.lastName}` : report.senderId;
 
   useEffect(() => {
@@ -324,13 +323,36 @@ function ReadReportModal({ report, sender, onClose, onMarkRead }: {
     }
   }, [report.id]);
 
-  const handleDownload = (fmt: "pdf" | "word") => {
-    setShowFmt(false);
-    if (fmt === "word") {
-      generateWord(report.title, report.content, senderName, null);
-    } else {
-      downloadReportTxt(report, senderName);
-    }
+  const handleDownloadPDF = () => {
+    const date = new Date(report.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+    const win = window.open("", "_blank", "width=760,height=900");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>${report.title}</title>
+    <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#111827;}
+    .hdr{background:linear-gradient(135deg,#4F46E5,#7C3AED);color:white;padding:28px 36px;}
+    .hdr h1{font-size:20px;font-weight:800;margin-bottom:4px;}.hdr p{font-size:11px;opacity:.8;}
+    .body{padding:28px 36px;}.meta{font-size:11px;color:#6B7280;margin-bottom:18px;}
+    .content{font-size:12px;line-height:1.8;white-space:pre-wrap;border-top:1px solid #E5E7EB;padding-top:14px;}
+    .att{margin-top:20px;padding:10px 14px;border-radius:6px;background:#F3F4F6;font-size:11px;color:#6B7280;}
+    .footer{margin-top:36px;padding:12px 36px;background:#F9FAFB;border-top:1px solid #E5E7EB;font-size:10px;color:#9CA3AF;display:flex;justify-content:space-between;}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head>
+    <body><div class="hdr"><h1>${report.title.replace(/</g,"&lt;")}</h1><p>De : ${senderName} &nbsp;·&nbsp; ${date}</p><p>${report.type}</p></div>
+    <div class="body"><div class="content">${report.content.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+    ${report.attachmentName ? `<div class="att">📎 Pièce jointe : ${report.attachmentName}</div>` : ""}
+    </div><div class="footer"><span>HR Manager — Document confidentiel</span><span>${date}</span></div>
+    <script>window.onload=function(){window.print();}</script></body></html>`);
+    win.document.close();
+  };
+
+  const handleDownloadAttachment = () => {
+    if (!report.attachmentData || !report.attachmentName) return;
+    const a = document.createElement("a");
+    a.href = report.attachmentData;
+    a.download = report.attachmentName;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
@@ -371,39 +393,31 @@ function ReadReportModal({ report, sender, onClose, onMarkRead }: {
           {report.content}
         </div>
 
-        <div className="flex gap-3 mt-5">
+        {report.attachmentName && (
+          <div className="flex items-center gap-2 mt-4 px-3 py-2.5 rounded-xl"
+            style={{ background: "var(--hr-hover)", border: "1px solid var(--hr-card-border-hard)" }}>
+            <Paperclip size={13} style={{ color: "#6366F1", flexShrink: 0 }} />
+            <span className="text-xs flex-1 truncate" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>{report.attachmentName}</span>
+            <button onClick={handleDownloadAttachment}
+              className="text-xs px-2.5 py-1 rounded-lg hover:opacity-80"
+              style={{ background: "rgba(99,102,241,0.1)", color: "#6366F1", fontWeight: 700 }}>
+              Télécharger
+            </button>
+          </div>
+        )}
+        <div className="flex gap-3 mt-4">
           <button onClick={onClose}
             className="flex-1 py-2.5 rounded-xl text-sm"
             style={{ background: "var(--hr-hover)", color: "var(--hr-text-muted)", fontWeight: 600, border: "1px solid var(--hr-card-border-hard)" }}
           >
             Fermer
           </button>
-          {showFmt ? (
-            <div className="flex gap-2 flex-1">
-              <button onClick={() => handleDownload("pdf")}
-                className="flex items-center gap-1.5 flex-1 py-2.5 justify-center rounded-xl text-sm hover:opacity-80"
-                style={{ border: "1.5px solid #EF4444", color: "#EF4444", fontWeight: 700, background: "rgba(239,68,68,0.08)" }}
-              >
-                <Printer size={13} />TXT/PDF
-              </button>
-              <button onClick={() => handleDownload("word")}
-                className="flex items-center gap-1.5 flex-1 py-2.5 justify-center rounded-xl text-sm hover:opacity-80"
-                style={{ border: "1.5px solid #2563EB", color: "#2563EB", fontWeight: 700, background: "rgba(37,99,235,0.08)" }}
-              >
-                <FileText size={13} />Word
-              </button>
-              <button onClick={() => setShowFmt(false)} className="px-3 py-2.5 rounded-xl" style={{ border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-muted)" }}>
-                <X size={14} />
-              </button>
-            </div>
-          ) : (
-            <button onClick={() => setShowFmt(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm hover:opacity-80"
-              style={{ border: "1.5px solid #6366F1", color: "#6366F1", fontWeight: 700, background: "rgba(99,102,241,0.08)" }}
-            >
-              <Download size={14} />Télécharger
-            </button>
-          )}
+          <button onClick={handleDownloadPDF}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm hover:opacity-80"
+            style={{ border: "1.5px solid #EF4444", color: "#EF4444", fontWeight: 700, background: "rgba(239,68,68,0.08)" }}
+          >
+            <Printer size={13} />PDF
+          </button>
         </div>
       </motion.div>
     </motion.div>
@@ -427,37 +441,21 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
     customEmail: "",
     includeData: true,
   });
-  const [headerImage, setHeaderImage] = useState<string | null>(null);
+  const [attachment, setAttachment] = useState<{ name: string; data: string } | null>(null);
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const handleHeaderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setHeaderImage(ev.target?.result as string);
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const baseName = file.name.replace(/\.[^/.]+$/, "");
-    if (file.name.endsWith(".txt")) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const text = ev.target?.result as string;
-        setForm((p) => ({ ...p, content: text, title: p.title || baseName }));
-      };
-      reader.readAsText(file);
-    } else if (file.name.endsWith(".pdf")) {
-      setForm((p) => ({ ...p, title: p.title || baseName, content: p.content || `[Contenu importé depuis ${file.name}]\n\nCe fichier PDF a été joint au rapport. Copiez-collez son contenu ici si nécessaire.` }));
-    } else if (file.name.endsWith(".docx") || file.name.endsWith(".doc")) {
-      setForm((p) => ({ ...p, title: p.title || baseName, content: p.content || `[Contenu importé depuis ${file.name}]\n\nCe fichier Word a été joint au rapport. Copiez-collez son contenu ici si nécessaire.` }));
-    } else {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const data = ev.target?.result as string;
+      setAttachment({ name: file.name, data });
       setForm((p) => ({ ...p, title: p.title || baseName }));
-    }
+    };
+    reader.readAsDataURL(file);
     e.target.value = "";
   };
 
@@ -486,6 +484,8 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
         title: form.title,
         type: form.type,
         content: form.content,
+        attachmentName: attachment?.name,
+        attachmentData: attachment?.data,
       });
       if (form.recipientId && form.recipientId !== "custom") {
         await notificationsApi.create({
@@ -668,35 +668,26 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
             </div>
           </div>
 
-          {/* En-tête + Import */}
-          <div className="flex gap-2">
-            <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs cursor-pointer hover:opacity-80 transition-all flex-1 justify-center"
-              style={{ border: "1.5px dashed var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600, background: headerImage ? "rgba(99,102,241,0.06)" : "var(--hr-hover)" }}
-            >
-              {headerImage ? (
-                <img src={headerImage} alt="en-tête" className="h-6 object-contain" />
-              ) : (
-                <><FileText size={12} />En-tête document</>
-              )}
-              <input type="file" accept="image/*" className="hidden" onChange={handleHeaderUpload} />
-            </label>
-            {headerImage && (
-              <button onClick={() => setHeaderImage(null)}
-                className="px-2 py-2 rounded-xl text-xs hover:opacity-80"
-                style={{ background: "#FEE2E2", color: "#DC2626" }}
-                title="Supprimer l'en-tête"
-              >
-                <X size={12} />
+          {/* Pièce jointe */}
+          {attachment ? (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+              style={{ background: "rgba(99,102,241,0.06)", border: "1.5px solid rgba(99,102,241,0.3)" }}>
+              <Paperclip size={13} style={{ color: "#6366F1", flexShrink: 0 }} />
+              <span className="text-xs flex-1 truncate" style={{ color: "var(--hr-text)", fontWeight: 600 }}>{attachment.name}</span>
+              <button onClick={() => setAttachment(null)}
+                className="w-5 h-5 rounded-full flex items-center justify-center hover:opacity-80"
+                style={{ background: "#FEE2E2", color: "#DC2626" }}>
+                <X size={10} />
               </button>
-            )}
-            <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs cursor-pointer hover:opacity-80 transition-all flex-1 justify-center"
+            </div>
+          ) : (
+            <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs cursor-pointer hover:opacity-80 transition-all justify-center"
               style={{ border: "1.5px dashed var(--hr-card-border-hard)", color: "var(--hr-text-sec)", fontWeight: 600, background: "var(--hr-hover)" }}
             >
-              <Download size={12} />
-              Importer un fichier
-              <input type="file" accept=".txt,.doc,.docx,.pdf" className="hidden" onChange={handleImportFile} />
+              <Paperclip size={12} />Joindre un fichier (PDF, Word, TXT…)
+              <input type="file" accept=".txt,.doc,.docx,.pdf,.xlsx,.csv" className="hidden" onChange={handleImportFile} />
             </label>
-          </div>
+          )}
 
           <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "var(--hr-hover)", border: "1px solid var(--hr-card-border-hard)" }}>
             <input

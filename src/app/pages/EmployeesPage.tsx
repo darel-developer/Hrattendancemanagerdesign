@@ -811,6 +811,9 @@ function EditEmployeeModal({ emp, onClose, onSave, allEmployees, departments, on
     managerId: emp.managerId || "", address: emp.address || "",
     status: emp.status as any, password: "",
   });
+  const [workDays, setWorkDays] = useState<string[]>(emp.workDays ?? [...ALL_WORK_DAYS]);
+  const toggleWorkDay = (day: string) =>
+    setWorkDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -841,6 +844,7 @@ function EditEmployeeModal({ emp, onClose, onSave, allEmployees, departments, on
         startDate: form.startDate || null, birthDate: form.birthDate || null,
         salary, managerId: form.managerId || null, address: form.address,
         status: form.status,
+        workDays: workDays.length === ALL_WORK_DAYS.length ? undefined : workDays,
         ...(form.password ? { password: form.password } : {}),
       });
       onClose();
@@ -945,6 +949,23 @@ function EditEmployeeModal({ emp, onClose, onSave, allEmployees, departments, on
             <input placeholder="123 Rue de la Paix" value={form.address} onChange={(e) => set("address", e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
               style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }} />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Jours de travail</label>
+            <div className="flex gap-1 flex-wrap">
+              {ALL_WORK_DAYS.map((day) => (
+                <button key={day} type="button" onClick={() => toggleWorkDay(day)}
+                  className="px-2.5 py-1.5 rounded-lg text-xs transition-all"
+                  style={{
+                    background: workDays.includes(day) ? "rgba(99,102,241,0.15)" : "var(--hr-input-bg)",
+                    border: workDays.includes(day) ? "1.5px solid #6366F1" : "1.5px solid var(--hr-card-border-hard)",
+                    color: workDays.includes(day) ? "#6366F1" : "var(--hr-text-muted)",
+                    fontWeight: workDays.includes(day) ? 700 : 400,
+                  }}>
+                  {day.slice(0, 3)}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="col-span-2">
             <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>Nouveau mot de passe (laisser vide pour ne pas changer)</label>

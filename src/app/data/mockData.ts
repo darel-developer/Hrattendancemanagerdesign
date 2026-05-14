@@ -97,6 +97,8 @@ export interface Report {
   content: string;
   createdAt: string;
   isRead: boolean;
+  attachmentName?: string | null;
+  attachmentData?: string | null;
 }
 
 // ─── Performance Reviews ──────────────────────────────────────────────────────

@@ -37,7 +37,7 @@ const allNavItems: NavItem[] = [
   { to: "/employees",    icon: Users,            label: "nav.employees",    roles: ["Admin"] },
   { to: "/departments",  icon: Building2,        label: "nav.departments",  roles: ["Admin"] },
   { to: "/attendance",  icon: Clock,            label: "nav.attendance",   roles: ["Admin", "Manager", "Employee"] },
-  { to: "/calendar",    icon: CalendarDays,     label: "nav.calendar",     roles: ["Admin", "Manager", "Employee"] },
+  { to: "/calendar",    icon: CalendarDays,     label: "nav.calendar",     roles: ["Admin", "Manager"] },
   { to: "/leaves",      icon: CalendarCheck,    label: "nav.leaves",       roles: ["Admin", "Manager", "Employee"] },
   { to: "/planning",    icon: LayoutGrid,       label: "nav.planning",     roles: ["Admin", "Manager"] },
   { to: "/performance", icon: Star,             label: "nav.performance",  roles: ["Admin", "Manager", "Employee"] },

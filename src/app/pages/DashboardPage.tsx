@@ -106,10 +106,15 @@ function AdminDashboard() {
   const onLeaveTodayIds = new Set(
     allLeaves.filter((l) => l.status === "Approuvé" && l.startDate <= today && l.endDate >= today).map((l) => l.employeeId)
   );
+  const todayDayFR = new Date().toLocaleDateString("fr-FR", { weekday: "long" });
+  const todayDayName = todayDayFR.charAt(0).toUpperCase() + todayDayFR.slice(1);
   const presentCount = todayRecords.filter((r) => r.status === "Présent" || r.status === "Télétravail").length;
   const lateCount = todayRecords.filter((r) => r.status === "Retard").length;
   const leaveCount = activeEmployees.filter((e) => onLeaveTodayIds.has(e.id)).length;
-  const absentCount = activeEmployees.filter((e) => !todayRecords.some((r) => r.employeeId === e.id) && !onLeaveTodayIds.has(e.id)).length;
+  const absentCount = activeEmployees.filter((e) => {
+    const worksToday = !e.workDays || e.workDays.length === 0 || e.workDays.includes(todayDayName);
+    return worksToday && !todayRecords.some((r) => r.employeeId === e.id) && !onLeaveTodayIds.has(e.id);
+  }).length;
   const pendingLeaves = allLeaves.filter((l) => l.status === "En attente").length;
 
   const pendingLeavesList = allLeaves
@@ -315,9 +320,14 @@ function ManagerDashboard() {
   const onLeaveTodayDept = new Set(
     allLeaves.filter((l) => l.status === "Approuvé" && l.startDate <= today && l.endDate >= today && deptEmployees.some((e) => e.id === l.employeeId)).map((l) => l.employeeId)
   );
+  const mgrTodayDayFR = new Date().toLocaleDateString("fr-FR", { weekday: "long" });
+  const mgrTodayDayName = mgrTodayDayFR.charAt(0).toUpperCase() + mgrTodayDayFR.slice(1);
   const presentCount = todayRecords.filter((r) => r.status === "Présent" || r.status === "Télétravail").length;
   const lateCount = todayRecords.filter((r) => r.status === "Retard").length;
-  const absentCount = deptEmployees.filter((e) => !todayRecords.some((r) => r.employeeId === e.id) && !onLeaveTodayDept.has(e.id)).length;
+  const absentCount = deptEmployees.filter((e) => {
+    const worksToday = !e.workDays || e.workDays.length === 0 || e.workDays.includes(mgrTodayDayName);
+    return worksToday && !todayRecords.some((r) => r.employeeId === e.id) && !onLeaveTodayDept.has(e.id);
+  }).length;
   const deptLeavesPending = allLeaves.filter((l) => l.status === "En attente" && deptEmployees.some((e) => e.id === l.employeeId)).length;
 
   return (

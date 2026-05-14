@@ -115,32 +115,43 @@ function notifId() {
 async function generateDailyAbsenceNotifications() {
   try {
     const today = new Date().toISOString().split('T')[0];
+    const dayNameFull = new Date().toLocaleDateString('fr-FR', { weekday: 'long' });
+    const todayDayName = dayNameFull.charAt(0).toUpperCase() + dayNameFull.slice(1);
+
     const [employees] = await db.query("SELECT * FROM employees WHERE status = 'Actif'");
     const [present] = await db.query(
       'SELECT DISTINCT employee_id FROM attendance_records WHERE date = ?', [today]
     );
     const presentIds = new Set(present.map(r => r.employee_id));
 
+    let absenceCount = 0;
     for (const emp of employees) {
-      if (!presentIds.has(emp.id)) {
-        // Avoid duplicate notifications for today
-        const [existing] = await db.query(
-          `SELECT id FROM notifications WHERE employee_id = ? AND type = 'absence'
-           AND DATE(date) = ? LIMIT 1`, [emp.id, today]
+      if (presentIds.has(emp.id)) continue;
+
+      // Skip if today is not one of the employee's scheduled work days
+      if (emp.work_days) {
+        const workDays = emp.work_days.split(',').map(d => d.trim()).filter(Boolean);
+        if (workDays.length > 0 && !workDays.includes(todayDayName)) continue;
+      }
+
+      // Avoid duplicate notifications for today
+      const [existing] = await db.query(
+        `SELECT id FROM notifications WHERE employee_id = ? AND type = 'absence'
+         AND DATE(date) = ? LIMIT 1`, [emp.id, today]
+      );
+      if (existing.length === 0) {
+        await db.query(
+          `INSERT INTO notifications (id, type, title, message, date, is_read, employee_id)
+           VALUES (?, 'absence', ?, ?, NOW(), FALSE, ?)`,
+          [notifId(),
+           `Absence non justifiée — ${emp.first_name} ${emp.last_name}`,
+           `${emp.first_name} ${emp.last_name} n'a pas pointé son arrivée aujourd'hui (${today}).`,
+           emp.id]
         );
-        if (existing.length === 0) {
-          await db.query(
-            `INSERT INTO notifications (id, type, title, message, date, is_read, employee_id)
-             VALUES (?, 'absence', ?, ?, NOW(), FALSE, ?)`,
-            [notifId(),
-             `Absence non justifiée — ${emp.first_name} ${emp.last_name}`,
-             `${emp.first_name} ${emp.last_name} n'a pas pointé son arrivée aujourd'hui (${today}).`,
-             emp.id]
-          );
-        }
+        absenceCount++;
       }
     }
-    console.log(`[Auto] Vérification absences ${today} — ${employees.length - presentIds.size} absence(s) détectée(s)`);
+    console.log(`[Auto] Vérification absences ${today} — ${absenceCount} absence(s) détectée(s) (sur ${employees.length} actifs)`);
   } catch (err) {
     console.error('[Auto] Erreur vérification absences :', err.message);
   }

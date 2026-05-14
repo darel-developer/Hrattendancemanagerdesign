@@ -81,13 +81,16 @@ router.post('/', requireAuth, async (req, res) => {
 router.put('/:id', requireAuth, async (req, res) => {
   try {
     const r = req.body;
-    await db.query(
-      `UPDATE attendance_records SET
-        check_in=?, check_out=?, status=?, hours_worked=?, note=?
-       WHERE id=?`,
-      [r.checkIn || null, r.checkOut || null, r.status,
-       r.hoursWorked ?? null, r.note || '', req.params.id]
-    );
+    const sets = [];
+    const params = [];
+    if (r.checkIn     !== undefined) { sets.push('check_in=?');     params.push(r.checkIn || null); }
+    if (r.checkOut    !== undefined) { sets.push('check_out=?');    params.push(r.checkOut || null); }
+    if (r.status      !== undefined) { sets.push('status=?');       params.push(r.status); }
+    if (r.hoursWorked !== undefined) { sets.push('hours_worked=?'); params.push(r.hoursWorked ?? null); }
+    if (r.note        !== undefined) { sets.push('note=?');         params.push(r.note || ''); }
+    if (sets.length === 0) return res.status(400).json({ error: 'Aucun champ à mettre à jour' });
+    params.push(req.params.id);
+    await db.query(`UPDATE attendance_records SET ${sets.join(', ')} WHERE id=?`, params);
     const [rows] = await db.query('SELECT * FROM attendance_records WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Enregistrement non trouvé' });
     if (r.checkOut) console.info(`[Attendance] check-out — record ${req.params.id} à ${r.checkOut}`);

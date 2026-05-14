@@ -1,4 +1,4 @@
-const CACHE_NAME = "hr-manager-v1";
+const CACHE_NAME = "hr-manager-v3";
 const STATIC_ASSETS = ["/", "/index.html"];
 
 self.addEventListener("install", (event) => {
