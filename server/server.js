@@ -8,6 +8,7 @@ const { runBackup, scheduleDaily } = require('./backup');
 
 const employeesRouter = require('./routes/employees');
 const attendanceRouter = require('./routes/attendance');
+const devicesRouter = require('./routes/devices');
 const leavesRouter = require('./routes/leaves');
 const notificationsRouter = require('./routes/notifications');
 const authRouter = require('./routes/auth');
@@ -84,6 +85,7 @@ app.use('/api/kiosk', kioskLimiter, kioskRouter);
 app.use('/api/superadmin', superadminLimiter, superadminRouter);
 
 // ─── Routes standard ──────────────────────────────────────────────────────────
+app.use('/api/devices', devicesRouter);
 app.use('/api/employees', employeesRouter);
 app.use('/api/attendance', attendanceRouter);
 app.use('/api/leaves', leavesRouter);
@@ -305,6 +307,40 @@ app.listen(PORT, async () => {
     console.log('[DB] Colonnes géolocalisation prêtes');
   } catch (err) {
     console.error('[DB] Erreur colonnes géo :', err.message);
+  }
+  // ── Liaison appareils employés ──────────────────────────────────────────────
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS employee_devices (
+        id          SERIAL PRIMARY KEY,
+        employee_id VARCHAR(50)  NOT NULL,
+        device_id   VARCHAR(255) NOT NULL,
+        device_name VARCHAR(255) DEFAULT 'Inconnu',
+        registered_at TIMESTAMP  DEFAULT NOW(),
+        last_seen_at  TIMESTAMP  DEFAULT NOW(),
+        is_active   BOOLEAN      DEFAULT TRUE,
+        UNIQUE (employee_id),
+        UNIQUE (device_id)
+      )
+    `);
+    console.log('[DB] Table employee_devices prête');
+  } catch (err) {
+    console.error('[DB] Erreur table employee_devices :', err.message);
+  }
+  // ── Tokens QR kiosque ───────────────────────────────────────────────────────
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS kiosk_tokens (
+        token      VARCHAR(255) PRIMARY KEY,
+        company_id VARCHAR(50)  NOT NULL,
+        created_at TIMESTAMP    DEFAULT NOW(),
+        expires_at TIMESTAMP    NOT NULL,
+        used_by    VARCHAR(50)  DEFAULT NULL
+      )
+    `);
+    console.log('[DB] Table kiosk_tokens prête');
+  } catch (err) {
+    console.error('[DB] Erreur table kiosk_tokens :', err.message);
   }
   // Convertir department de ENUM → VARCHAR pour accepter les départements personnalisés
   // (PostgreSQL ne supporte pas ENUM inline dans les migrations — on s'assure juste que la colonne existe en VARCHAR)

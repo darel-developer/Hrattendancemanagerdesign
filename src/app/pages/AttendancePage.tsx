@@ -9,6 +9,7 @@ import { AttendanceRecord } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
 import { attendanceApi } from "../services/api";
 import { getQueue, enqueue, dequeue } from "../utils/attendanceQueue";
+import { getDeviceId } from "../utils/deviceId";
 
 const statusConfig: Record<string, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
   "Présent": { bg: "#D1FAE5", text: "#16A34A", icon: <CheckCircle2 size={13} />, label: "Présent" },
@@ -206,7 +207,7 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
       : currentCompany
         ? computeCheckInStatus(recordedTime, currentCompany.workStart ?? "09:00", currentCompany.lateTolerance ?? 5)
         : "Présent";
-    // Include GPS coords so the server can validate the position independently
+    // Include GPS coords + device_id so the server can validate
     const geoPayload = workMode === "présentiel" && geoCoords
       ? { latitude: geoCoords.lat, longitude: geoCoords.lng }
       : {};
@@ -217,6 +218,7 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
         checkIn: recordedTime,
         status,
         note: note || "",
+        deviceId: getDeviceId(),
         ...geoPayload,
       });
       setSavedRecordId(created.id);
@@ -228,9 +230,13 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("trop loin") || msg.includes("GPS requis") || msg.includes("Localisation")) {
-        // Server-side geo rejection — don't queue, show the error
         setGeoBlockError(msg);
-        retryGeo(); // refresh the position display
+        retryGeo();
+        return;
+      }
+      if (msg.includes("Appareil") || msg.includes("device") || msg.includes("appareil")) {
+        // Device not registered or blocked — don't queue, show error
+        setGeoBlockError(msg);
         return;
       }
       // Network error — save optimistically and queue for later sync

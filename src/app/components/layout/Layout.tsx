@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, Navigate } from "react-router";
+import { Outlet, Navigate, useLocation } from "react-router";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { BottomNav } from "./BottomNav";
@@ -9,6 +9,7 @@ import { LayoutContext } from "../../context/LayoutContext";
 export function Layout() {
   const { isAuthenticated, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
 
   // Silent background geolocation permission request at app start.
   useEffect(() => {
@@ -43,7 +44,8 @@ export function Layout() {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    const returnUrl = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?returnUrl=${returnUrl}`} replace />;
   }
 
   return (

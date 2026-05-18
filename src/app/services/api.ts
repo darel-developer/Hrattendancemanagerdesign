@@ -224,9 +224,35 @@ export const kioskApi = {
     request<Pick<Employee, "id" | "firstName" | "lastName" | "avatar" | "position" | "department">[]>(
       `/kiosk/employees/${companyId}`
     ),
-  checkin: (employeeId: string, pin: string, companyId: string, latitude?: number | null, longitude?: number | null) =>
+  getToken: (companyId: string) =>
+    request<{ token: string; companyId: string; expiresAt: string }>(`/kiosk/token/${companyId}`),
+  scan: (token: string, companyId: string, deviceId: string, latitude?: number | null, longitude?: number | null) =>
     request<{ success: boolean; action: "check_in" | "check_out"; time: string; hoursWorked?: number; employee: string; status?: string }>(
-      "/kiosk/checkin",
-      { method: "POST", body: JSON.stringify({ employeeId, pin, companyId, latitude, longitude }) }
+      "/kiosk/scan",
+      { method: "POST", body: JSON.stringify({ token, companyId, deviceId, latitude, longitude }) }
     ),
+};
+
+// ─── Devices ──────────────────────────────────────────────────
+export interface DeviceInfo {
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  department: string;
+  deviceName: string;
+  registeredAt: string;
+  lastSeenAt: string;
+  isActive: boolean;
+}
+
+export const devicesApi = {
+  register: (deviceId: string, deviceName: string) =>
+    request<{ success: boolean }>("/devices/register", {
+      method: "POST",
+      body: JSON.stringify({ deviceId, deviceName }),
+    }),
+  me: () => request<{ registered: boolean; deviceName?: string; registeredAt?: string }>("/devices/me"),
+  list: () => request<DeviceInfo[]>("/devices"),
+  reset: (employeeId: string) =>
+    request<{ success: boolean }>(`/devices/${employeeId}`, { method: "DELETE" }),
 };

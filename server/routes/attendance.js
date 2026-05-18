@@ -47,6 +47,32 @@ router.post('/', requireAuth, async (req, res) => {
     const r = req.body;
     const id = r.id || `ATT${Date.now()}`;
 
+    // Device verification — employees doing self check-in must use their registered device
+    if (req.user?.role === 'Employee' && r.checkIn && !r.checkOut) {
+      const deviceId = r.deviceId;
+      if (!deviceId) {
+        return res.status(403).json({
+          error: 'Appareil non identifié. Reconnectez-vous pour enregistrer cet appareil.',
+          deviceRequired: true,
+        });
+      }
+      const [devRows] = await db.query(
+        `SELECT employee_id FROM employee_devices
+         WHERE device_id = ? AND employee_id = ? AND is_active = TRUE`,
+        [deviceId, r.employeeId]
+      );
+      if (devRows.length === 0) {
+        return res.status(403).json({
+          error: 'Appareil non autorisé. Contactez l\'administration.',
+          deviceBlocked: true,
+        });
+      }
+      await db.query(
+        'UPDATE employee_devices SET last_seen_at = NOW() WHERE employee_id = ?',
+        [r.employeeId]
+      );
+    }
+
     // Auto-compute status + geo validation for présentiel check-in
     let status = r.status;
     if (r.checkIn && !r.checkOut && r.status !== 'Télétravail' && r.status !== 'Congé') {

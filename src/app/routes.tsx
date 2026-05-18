@@ -3,6 +3,7 @@ import { Layout } from "./components/layout/Layout";
 import { RequireRole } from "./components/RequireRole";
 import { LoginPage } from "./pages/LoginPage";
 import { KioskPage } from "./pages/KioskPage";
+import { KioskScanPage } from "./pages/KioskScanPage";
 import { SuperAdminPage } from "./pages/SuperAdminPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EmployeesPage } from "./pages/EmployeesPage";
@@ -26,6 +27,10 @@ export const router = createBrowserRouter([
   {
     path: "/kiosk",
     Component: KioskPage,
+  },
+  {
+    path: "/kiosk/scan",
+    Component: KioskScanPage,
   },
   {
     path: "/superadmin",

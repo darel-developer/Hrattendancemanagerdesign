@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { Employee, Company } from "../data/mockData";
-import { employeesApi, authApi, companiesApi, setAuthToken } from "../services/api";
+import { employeesApi, authApi, companiesApi, devicesApi, setAuthToken } from "../services/api";
+import { getDeviceId, getDeviceName } from "../utils/deviceId";
+
+export type LoginResult = true | "device_conflict" | "device_new" | false;
 
 interface AuthContextType {
   currentUser: Employee | null;
   currentCompany: Company | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<LoginResult>;
   logout: () => void;
   isAuthenticated: boolean;
   loading: boolean;
@@ -68,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("auth:expired", handleExpired);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<LoginResult> => {
     try {
       const { token, user } = await authApi.login(email, password);
       setAuthToken(token);
@@ -78,6 +81,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         employeesApi.getAll({ companyId }),
         companiesApi.getById(companyId),
       ]);
+
+      // Register this device for the logged-in user
+      try {
+        await devicesApi.register(getDeviceId(), getDeviceName());
+      } catch (devErr: unknown) {
+        const msg = devErr instanceof Error ? devErr.message : "";
+        // Device belongs to another account — block access
+        if (msg.includes("autre compte") || msg.includes("conflict")) {
+          setAuthToken(null);
+          localStorage.removeItem(TOKEN_KEY);
+          return "device_conflict";
+        }
+        // Employee has a different device registered — block until admin resets
+        if (msg.includes("déjà un appareil") || msg.includes("newDevice")) {
+          setAuthToken(null);
+          localStorage.removeItem(TOKEN_KEY);
+          return "device_new";
+        }
+        // Other device errors are non-blocking (network issue etc.)
+      }
+
       setCurrentUser(user);
       setEmployees(emps);
       setCurrentCompany(company);

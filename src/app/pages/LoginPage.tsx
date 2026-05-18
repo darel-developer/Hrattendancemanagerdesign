@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useNavigate, Navigate } from "react-router";
+import { useNavigate, Navigate, useSearchParams } from "react-router";
 import { motion } from "motion/react";
-import { Building2, Eye, EyeOff, Lock, Mail, ArrowRight, Shield, Users, BarChart3 } from "lucide-react";
+import { Building2, Eye, EyeOff, Lock, Mail, ArrowRight, Shield, Users, BarChart3, Smartphone } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 const features = [
@@ -18,18 +18,27 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnUrl = searchParams.get("returnUrl") ?? "/dashboard";
 
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  if (isAuthenticated) return <Navigate to={returnUrl} replace />;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600));
-    const ok = await login(email, password);
+    const result = await login(email, password);
     setLoading(false);
-    if (ok) navigate("/dashboard");
-    else setError("Email ou mot de passe incorrect");
+    if (result === true) {
+      navigate(returnUrl, { replace: true });
+    } else if (result === "device_conflict") {
+      setError("Cet appareil est déjà associé à un autre compte. Utilisez votre appareil habituel ou contactez l'administration.");
+    } else if (result === "device_new") {
+      setError("Un autre appareil est déjà enregistré pour ce compte. Contactez l'administration pour réinitialiser votre appareil.");
+    } else {
+      setError("Email ou mot de passe incorrect");
+    }
   };
 
   return (

@@ -1,23 +1,146 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   User, Building2, Bell, Shield, Palette, Globe, ChevronRight,
   Camera, Save, Lock, Mail, Phone, MapPin, Sun, Moon,
-  Check, X, Eye, EyeOff, AlertCircle, Upload, Navigation
+  Check, X, Eye, EyeOff, AlertCircle, Upload, Navigation,
+  Smartphone, Trash2, RefreshCw, Loader2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
-import { companiesApi } from "../services/api";
+import { companiesApi, devicesApi, DeviceInfo } from "../services/api";
 import { Company } from "../data/mockData";
 
 const sections = [
   { id: "profile", icon: User, label: "Profil personnel" },
   { id: "company", icon: Building2, label: "Entreprise" },
+  { id: "devices", icon: Smartphone, label: "Appareils" },
   { id: "notifications", icon: Bell, label: "Notifications" },
   { id: "security", icon: Shield, label: "Sécurité" },
   { id: "appearance", icon: Palette, label: "Apparence" },
   { id: "language", icon: Globe, label: "Langue & Région" },
 ];
+
+// ─── Device management panel ─────────────────────────────────────────────────
+function DevicesPanel({ isAdmin }: { isAdmin: boolean }) {
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [myDevice, setMyDevice] = useState<{ registered: boolean; deviceName?: string; registeredAt?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [resetting, setResetting] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [me, list] = await Promise.all([
+        devicesApi.me(),
+        isAdmin ? devicesApi.list() : Promise.resolve([] as DeviceInfo[]),
+      ]);
+      setMyDevice(me);
+      setDevices(list);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [isAdmin]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const handleReset = async (employeeId: string) => {
+    if (!window.confirm("Réinitialiser l'appareil de cet employé ? Il devra se reconnecter pour enregistrer son nouvel appareil.")) return;
+    setResetting(employeeId);
+    try {
+      await devicesApi.reset(employeeId);
+      await load();
+    } catch { /* ignore */ }
+    finally { setResetting(null); }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={24} className="animate-spin" style={{ color: "var(--hr-text-muted)" }} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* My device */}
+      <div className="rounded-2xl p-5" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
+        <p className="text-sm font-bold mb-4" style={{ color: "var(--hr-text)" }}>Mon appareil enregistré</p>
+        {myDevice?.registered ? (
+          <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(16,185,129,0.15)" }}>
+              <Smartphone size={16} style={{ color: "#10B981" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate" style={{ color: "var(--hr-text)" }}>{myDevice.deviceName}</p>
+              {myDevice.registeredAt && (
+                <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-muted)" }}>
+                  Enregistré le {new Date(myDevice.registeredAt).toLocaleDateString("fr-FR")}
+                </p>
+              )}
+            </div>
+            <span className="text-xs px-2 py-1 rounded-full font-semibold" style={{ background: "rgba(16,185,129,0.15)", color: "#10B981" }}>Actif</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}>
+            <AlertCircle size={16} style={{ color: "#F59E0B", flexShrink: 0 }} />
+            <p className="text-xs font-semibold" style={{ color: "#D97706" }}>
+              Aucun appareil enregistré. Déconnectez-vous et reconnectez-vous pour enregistrer cet appareil.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Admin: all devices */}
+      {isAdmin && (
+        <div className="rounded-2xl overflow-hidden" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--hr-card-border)" }}>
+            <p className="text-sm font-bold" style={{ color: "var(--hr-text)" }}>Appareils enregistrés ({devices.length})</p>
+            <button onClick={() => void load()} className="p-1.5 rounded-lg transition-all hover:opacity-70" style={{ color: "var(--hr-text-muted)" }}>
+              <RefreshCw size={14} />
+            </button>
+          </div>
+          {devices.length === 0 ? (
+            <p className="text-sm text-center py-8" style={{ color: "var(--hr-text-muted)" }}>Aucun appareil enregistré</p>
+          ) : (
+            <div className="divide-y" style={{ borderColor: "var(--hr-card-border)" }}>
+              {devices.map((d) => (
+                <div key={d.employeeId} className="flex items-center gap-3 px-5 py-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "var(--hr-hover)" }}>
+                    <Smartphone size={14} style={{ color: "var(--hr-text-muted)" }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: "var(--hr-text)" }}>
+                      {d.firstName} {d.lastName}
+                    </p>
+                    <p className="text-xs truncate" style={{ color: "var(--hr-text-muted)" }}>
+                      {d.deviceName} · {d.department}
+                    </p>
+                    {d.lastSeenAt && (
+                      <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>
+                        Vu le {new Date(d.lastSeenAt).toLocaleDateString("fr-FR")}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => void handleReset(d.employeeId)}
+                    disabled={resetting === d.employeeId}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl transition-all hover:opacity-80"
+                    style={{ background: "rgba(239,68,68,0.1)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+                    {resetting === d.employeeId
+                      ? <Loader2 size={12} className="animate-spin" />
+                      : <Trash2 size={12} />}
+                    Réinitialiser
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SettingsPage() {
   const { currentUser, currentCompany, updateEmployee, changePassword, refreshCompany } = useAuth();
@@ -359,6 +482,11 @@ export function SettingsPage() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Devices */}
+        {activeSection === "devices" && (
+          <DevicesPanel isAdmin={currentUser?.role === "Admin"} />
         )}
 
         {/* Notifications */}
