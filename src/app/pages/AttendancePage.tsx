@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import jsQR from "jsqr";
 import {
   CheckCircle2, XCircle, Timer, MonitorSmartphone, CalendarDays,
   Clock, ChevronLeft, ChevronRight, Download, Edit3, AlertCircle, X, MapPin,
-  WifiOff, Loader2,
+  WifiOff, Loader2, Camera,
 } from "lucide-react";
 import { AttendanceRecord } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
-import { attendanceApi } from "../services/api";
+import { attendanceApi, kioskApi } from "../services/api";
 import { getQueue, enqueue, dequeue } from "../utils/attendanceQueue";
 import { getDeviceId } from "../utils/deviceId";
 
@@ -85,6 +86,207 @@ function computeCheckInStatus(
   return ch * 60 + cm > wh * 60 + wm + lateTolerance ? "Retard" : "Présent";
 }
 
+// ─── QR Scanner Modal ─────────────────────────────────────────────────────────
+type ScanResult = { success: boolean; action: "check_in" | "check_out"; time: string; status?: string };
+
+function QrScannerModal({
+  onClose,
+  onScanSuccess,
+}: {
+  onClose: () => void;
+  onScanSuccess: (result: ScanResult) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>(0);
+  const stateRef = useRef<"scanning" | "processing">("scanning");
+  const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const successCbRef = useRef(onScanSuccess);
+  successCbRef.current = onScanSuccess;
+
+  const [uiState, setUiState] = useState<"scanning" | "processing" | "cam_error" | "scan_error">("scanning");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    navigator.geolocation?.getCurrentPosition(
+      (p) => { coordsRef.current = { lat: p.coords.latitude, lng: p.coords.longitude }; },
+      () => {}
+    );
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const handleQr = async (data: string) => {
+      stateRef.current = "processing";
+      setUiState("processing");
+      try {
+        const url = new URL(data);
+        const t = url.searchParams.get("t");
+        const c = url.searchParams.get("c");
+        if (!t || !c) throw new Error("QR non reconnu — pas un code HR Manager");
+        const result = await kioskApi.scan(t, c, getDeviceId(), coordsRef.current?.lat, coordsRef.current?.lng);
+        if (!mounted) return;
+        cancelAnimationFrame(rafRef.current);
+        streamRef.current?.getTracks().forEach((tr) => tr.stop());
+        successCbRef.current(result);
+      } catch (err) {
+        if (!mounted) return;
+        setErrorMsg(err instanceof Error ? err.message : "Erreur lors du scan");
+        setUiState("scan_error");
+        stateRef.current = "scanning";
+        setTimeout(() => {
+          if (!mounted) return;
+          setUiState("scanning");
+          setErrorMsg("");
+          rafRef.current = requestAnimationFrame(tick);
+        }, 3000);
+      }
+    };
+
+    const tick = () => {
+      if (!mounted) return;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { rafRef.current = requestAnimationFrame(tick); return; }
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imgData.data, imgData.width, imgData.height);
+      if (code && stateRef.current === "scanning") {
+        void handleQr(code.data);
+        return;
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } } })
+      .then((stream) => {
+        if (!mounted) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play()
+            .then(() => { rafRef.current = requestAnimationFrame(tick); })
+            .catch(() => {});
+        }
+      })
+      .catch(() => { if (mounted) setUiState("cam_error"); });
+
+    return () => {
+      mounted = false;
+      cancelAnimationFrame(rafRef.current);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cornerBorderColor =
+    uiState === "processing" ? "#10B981" : uiState === "scan_error" ? "#EF4444" : "#6366F1";
+
+  const corners = [
+    { top: 0, left: 0, borderTop: "3px solid", borderLeft: "3px solid", borderRadius: "12px 0 0 0" },
+    { top: 0, right: 0, borderTop: "3px solid", borderRight: "3px solid", borderRadius: "0 12px 0 0" },
+    { bottom: 0, left: 0, borderBottom: "3px solid", borderLeft: "3px solid", borderRadius: "0 0 0 12px" },
+    { bottom: 0, right: 0, borderBottom: "3px solid", borderRight: "3px solid", borderRadius: "0 0 12px 0" },
+  ];
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden"
+      style={{ background: "#000" }}
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 30 }}
+    >
+      <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" muted playsInline />
+      <canvas ref={canvasRef} className="hidden" />
+
+      {/* Scanner window with box-shadow overlay */}
+      <div className="absolute inset-0 flex items-center justify-center" style={{ pointerEvents: "none" }}>
+        <div
+          className="relative"
+          style={{
+            width: 260,
+            height: 260,
+            borderRadius: "16px",
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.62)",
+          }}
+        >
+          {corners.map((style, i) => (
+            <div key={i} className="absolute w-8 h-8" style={{ ...style, borderColor: cornerBorderColor }} />
+          ))}
+          {uiState === "scanning" && (
+            <motion.div
+              className="absolute left-2 right-2 h-0.5 rounded-full"
+              style={{ background: "linear-gradient(90deg, transparent, #6366F1, transparent)" }}
+              animate={{ top: ["8%", "86%", "8%"] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            />
+          )}
+          {uiState === "processing" && (
+            <div className="absolute inset-0 rounded-2xl flex items-center justify-center"
+              style={{ background: "rgba(16,185,129,0.18)" }}>
+              <Loader2 size={40} className="animate-spin" style={{ color: "#10B981" }} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Top bar */}
+      <div className="relative z-10 flex items-center justify-between px-5 pt-12 pb-4">
+        <div className="flex items-center gap-2">
+          <Camera size={18} className="text-white" />
+          <p className="text-white text-base" style={{ fontWeight: 700 }}>Scanner le QR Kiosk</p>
+        </div>
+        <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center"
+          style={{ background: "rgba(255,255,255,0.15)" }}>
+          <X size={18} className="text-white" />
+        </button>
+      </div>
+
+      {/* Bottom status */}
+      <div className="relative z-10 mt-auto px-6 pb-14 text-center space-y-3">
+        {uiState === "scanning" && (
+          <p className="text-white text-sm" style={{ fontWeight: 600 }}>
+            Pointez la caméra vers le QR code du terminal de pointage
+          </p>
+        )}
+        {uiState === "processing" && (
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 size={15} className="animate-spin" style={{ color: "#10B981" }} />
+            <p className="text-sm" style={{ color: "#34D399", fontWeight: 600 }}>Validation du pointage…</p>
+          </div>
+        )}
+        {uiState === "scan_error" && (
+          <div className="p-4 rounded-2xl" style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)" }}>
+            <p className="text-sm mb-1" style={{ color: "#FCA5A5", fontWeight: 700 }}>Erreur</p>
+            <p className="text-xs" style={{ color: "#F87171" }}>{errorMsg}</p>
+            <p className="text-xs mt-1" style={{ color: "#6B7280" }}>Nouvelle tentative dans 3 s…</p>
+          </div>
+        )}
+        {uiState === "cam_error" && (
+          <div className="p-4 rounded-2xl" style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)" }}>
+            <p className="text-sm" style={{ color: "#FCA5A5", fontWeight: 700 }}>Caméra inaccessible</p>
+            <p className="text-xs mt-1" style={{ color: "#F87171" }}>
+              Vérifiez que l'application a la permission d'accès à la caméra puis réessayez.
+            </p>
+          </div>
+        )}
+        <p className="text-xs" style={{ color: "#4B5563" }}>Le QR code se trouve sur le terminal de pointage</p>
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Employee Personal Check-In Widget ──────────────────────────────────────
 function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
   employeeId: string;
@@ -102,6 +304,7 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
   const [workMode, setWorkMode] = useState<"présentiel" | "télétravail">("présentiel");
   const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
   const [recordedStatus, setRecordedStatus] = useState<string>("");
+  const [showScanner, setShowScanner] = useState(false);
 
   const { geoStatus, distance, coords: geoCoords, retry: retryGeo } = useAttendanceGeo(
     currentCompany?.latitude,
@@ -277,6 +480,19 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
     }
     setCheckOutTime(outTime);
     setCheckInState("out");
+  };
+
+  const handleScanSuccess = (result: ScanResult) => {
+    setShowScanner(false);
+    if (result.action === "check_in") {
+      setCheckInTime(result.time);
+      setCheckInState("in");
+      setRecordedStatus(result.status ?? "Présent");
+    } else {
+      setCheckOutTime(result.time);
+      setCheckInState("out");
+    }
+    onRefresh?.();
   };
 
   // todayRecord comes from parent via props
@@ -489,38 +705,55 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
         {/* Action buttons */}
         {checkInState === "none" && (
           <div className="space-y-2">
-            <button
-              onClick={canCheckIn ? handleCheckIn : undefined}
-              disabled={!canCheckIn}
-              className="w-full rounded-xl text-white transition-all active:scale-95 flex items-center justify-center gap-2 min-h-[64px]"
-              style={{
-                background: canCheckIn
-                  ? "linear-gradient(135deg, #10B981, #059669)"
-                  : "rgba(255,255,255,0.08)",
-                fontWeight: 700,
-                padding: "1rem",
-                opacity: canCheckIn ? 1 : 0.65,
-                cursor: canCheckIn ? "pointer" : "not-allowed",
-                border: canCheckIn ? "none" : "1px solid rgba(255,255,255,0.15)",
-              }}
-            >
-              <CheckCircle2 size={18} />
-              {canCheckIn
-                ? `✓ Pointer mon arrivée — ${formatTime(time)}`
-                : geoStatus === "denied"
-                  ? `📍 Hors zone · ${distance} m / ${currentCompany?.geoRadius ?? 100} m`
-                  : geoStatus === "error"
-                    ? "GPS introuvable — touchez ↺ pour réessayer"
-                    : "Localisation en cours…"}
-            </button>
-            <button
-              onClick={() => setShowManualEntry(!showManualEntry)}
-              className="w-full py-2 rounded-xl text-xs transition-all"
-              style={{ background: "rgba(255,255,255,0.05)", color: "#94A3B8", border: "1px solid rgba(255,255,255,0.1)" }}
-            >
-              <Edit3 size={11} className="inline mr-1" />
-              {showManualEntry ? "Utiliser l'heure actuelle" : "Je suis arrivé plus tôt — saisir l'heure"}
-            </button>
+            {workMode === "présentiel" ? (
+              <button
+                onClick={() => setShowScanner(true)}
+                className="w-full rounded-xl text-white transition-all active:scale-95 flex items-center justify-center gap-2 min-h-[64px]"
+                style={{
+                  background: "linear-gradient(135deg, #6366F1, #8B5CF6)",
+                  fontWeight: 700,
+                  padding: "1rem",
+                }}
+              >
+                <Camera size={18} />
+                Scanner le QR — Pointer mon arrivée
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={canCheckIn ? handleCheckIn : undefined}
+                  disabled={!canCheckIn}
+                  className="w-full rounded-xl text-white transition-all active:scale-95 flex items-center justify-center gap-2 min-h-[64px]"
+                  style={{
+                    background: canCheckIn
+                      ? "linear-gradient(135deg, #10B981, #059669)"
+                      : "rgba(255,255,255,0.08)",
+                    fontWeight: 700,
+                    padding: "1rem",
+                    opacity: canCheckIn ? 1 : 0.65,
+                    cursor: canCheckIn ? "pointer" : "not-allowed",
+                    border: canCheckIn ? "none" : "1px solid rgba(255,255,255,0.15)",
+                  }}
+                >
+                  <CheckCircle2 size={18} />
+                  {canCheckIn
+                    ? `✓ Pointer mon arrivée — ${formatTime(time)}`
+                    : geoStatus === "denied"
+                      ? `📍 Hors zone · ${distance} m / ${currentCompany?.geoRadius ?? 100} m`
+                      : geoStatus === "error"
+                        ? "GPS introuvable — touchez ↺ pour réessayer"
+                        : "Localisation en cours…"}
+                </button>
+                <button
+                  onClick={() => setShowManualEntry(!showManualEntry)}
+                  className="w-full py-2 rounded-xl text-xs transition-all"
+                  style={{ background: "rgba(255,255,255,0.05)", color: "#94A3B8", border: "1px solid rgba(255,255,255,0.1)" }}
+                >
+                  <Edit3 size={11} className="inline mr-1" />
+                  {showManualEntry ? "Utiliser l'heure actuelle" : "Je suis arrivé plus tôt — saisir l'heure"}
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -550,6 +783,15 @@ function PersonalCheckIn({ employeeId, todayRecord, onRefresh }: {
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {showScanner && (
+          <QrScannerModal
+            onClose={() => setShowScanner(false)}
+            onScanSuccess={handleScanSuccess}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
