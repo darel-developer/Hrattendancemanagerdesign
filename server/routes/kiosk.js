@@ -312,13 +312,14 @@ router.post('/accounts', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Mot de passe trop court (6 caractères minimum)' });
     }
     const hash = await hashPassword(password);
-    const [result] = await db.query(
-      'INSERT INTO kiosk_accounts (email, password_hash, company_id, label) VALUES (?, ?, ?, ?)',
+    const [rows] = await db.query(
+      'INSERT INTO kiosk_accounts (email, password_hash, company_id, label) VALUES (?, ?, ?, ?) RETURNING id',
       [email.trim().toLowerCase(), hash, req.user.companyId, label || null]
     );
-    res.status(201).json({ id: result.insertId, email: email.trim().toLowerCase(), label: label || null, deviceBound: false, isActive: true });
+    const newId = rows[0]?.id ?? null;
+    res.status(201).json({ id: newId, email: email.trim().toLowerCase(), label: label || null, deviceBound: false, isActive: true });
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY' || (err.message && err.message.includes('unique'))) {
+    if (err.message && (err.message.includes('unique') || err.message.includes('duplicate'))) {
       return res.status(409).json({ error: 'Un compte kiosk avec cet email existe déjà' });
     }
     console.error('[Kiosk] POST /accounts:', err.message);

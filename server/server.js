@@ -346,15 +346,14 @@ app.listen(PORT, async () => {
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS kiosk_accounts (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        email VARCHAR(255) NOT NULL,
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
         company_id VARCHAR(50) NOT NULL,
         label VARCHAR(255),
         device_id VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_active TINYINT(1) DEFAULT 1,
-        UNIQUE KEY uq_kiosk_email (email)
+        created_at TIMESTAMP DEFAULT NOW(),
+        is_active BOOLEAN DEFAULT TRUE
       )
     `);
     console.log('[DB] Table kiosk_accounts prête');
