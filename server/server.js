@@ -342,6 +342,25 @@ app.listen(PORT, async () => {
   } catch (err) {
     console.error('[DB] Erreur table kiosk_tokens :', err.message);
   }
+  // ── Comptes kiosk (terminaux nommés par l'admin) ────────────────────────────
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS kiosk_accounts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        company_id VARCHAR(50) NOT NULL,
+        label VARCHAR(255),
+        device_id VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_active TINYINT(1) DEFAULT 1,
+        UNIQUE KEY uq_kiosk_email (email)
+      )
+    `);
+    console.log('[DB] Table kiosk_accounts prête');
+  } catch (err) {
+    console.error('[DB] Erreur table kiosk_accounts :', err.message);
+  }
   // Convertir department de ENUM → VARCHAR pour accepter les départements personnalisés
   // (PostgreSQL ne supporte pas ENUM inline dans les migrations — on s'assure juste que la colonne existe en VARCHAR)
   try {

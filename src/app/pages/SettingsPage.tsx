@@ -4,21 +4,22 @@ import {
   User, Building2, Bell, Shield, Palette, Globe, ChevronRight,
   Camera, Save, Lock, Mail, Phone, MapPin, Sun, Moon,
   Check, X, Eye, EyeOff, AlertCircle, Upload, Navigation,
-  Smartphone, Trash2, RefreshCw, Loader2,
+  Smartphone, Trash2, RefreshCw, Loader2, MonitorSmartphone, Plus,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
-import { companiesApi, devicesApi, DeviceInfo } from "../services/api";
+import { companiesApi, devicesApi, DeviceInfo, kioskAccountsApi, KioskAccount } from "../services/api";
 import { Company } from "../data/mockData";
 
 const sections = [
-  { id: "profile", icon: User, label: "Profil personnel" },
-  { id: "company", icon: Building2, label: "Entreprise" },
-  { id: "devices", icon: Smartphone, label: "Appareils" },
-  { id: "notifications", icon: Bell, label: "Notifications" },
-  { id: "security", icon: Shield, label: "Sécurité" },
-  { id: "appearance", icon: Palette, label: "Apparence" },
-  { id: "language", icon: Globe, label: "Langue & Région" },
+  { id: "profile", icon: User, label: "Profil personnel", roles: null },
+  { id: "company", icon: Building2, label: "Entreprise", roles: null },
+  { id: "devices", icon: Smartphone, label: "Appareils", roles: null },
+  { id: "kiosk", icon: MonitorSmartphone, label: "Terminaux Kiosk", roles: ["Admin"] as string[] },
+  { id: "notifications", icon: Bell, label: "Notifications", roles: null },
+  { id: "security", icon: Shield, label: "Sécurité", roles: null },
+  { id: "appearance", icon: Palette, label: "Apparence", roles: null },
+  { id: "language", icon: Globe, label: "Langue & Région", roles: null },
 ];
 
 // ─── Device management panel ─────────────────────────────────────────────────
@@ -138,6 +139,284 @@ function DevicesPanel({ isAdmin }: { isAdmin: boolean }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Kiosk Accounts panel ─────────────────────────────────────────────────────
+function KioskAccountsPanel() {
+  const [accounts, setAccounts] = useState<KioskAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createEmail, setCreateEmail] = useState("");
+  const [createPassword, setCreatePassword] = useState("");
+  const [createLabel, setCreateLabel] = useState("");
+  const [showCreatePwd, setShowCreatePwd] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [resettingId, setResettingId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await kioskAccountsApi.list();
+      setAccounts(rows);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateError(null);
+    if (!createEmail.trim() || !createPassword) return;
+    setCreating(true);
+    try {
+      const account = await kioskAccountsApi.create({
+        email: createEmail.trim(),
+        password: createPassword,
+        label: createLabel.trim() || undefined,
+      });
+      setAccounts((prev) => [account, ...prev]);
+      setShowCreate(false);
+      setCreateEmail("");
+      setCreatePassword("");
+      setCreateLabel("");
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Erreur lors de la création");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Supprimer ce compte kiosk ? Le terminal sera déconnecté.")) return;
+    setDeletingId(id);
+    try {
+      await kioskAccountsApi.delete(id);
+      setAccounts((prev) => prev.filter((a) => a.id !== id));
+    } catch { /* ignore */ }
+    finally { setDeletingId(null); }
+  };
+
+  const handleResetDevice = async (id: number) => {
+    if (!window.confirm("Réinitialiser l'appareil lié à ce compte ? Le terminal devra se reconnecter.")) return;
+    setResettingId(id);
+    try {
+      await kioskAccountsApi.resetDevice(id);
+      setAccounts((prev) => prev.map((a) => a.id === id ? { ...a, deviceBound: false } : a));
+    } catch { /* ignore */ }
+    finally { setResettingId(null); }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={24} className="animate-spin" style={{ color: "var(--hr-text-muted)" }} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Header card */}
+      <div className="rounded-2xl p-5" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <p className="text-sm font-bold" style={{ color: "var(--hr-text)" }}>Terminaux Kiosk</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)" }}>
+              Créez des comptes dédiés pour chaque terminal de pointage.
+            </p>
+          </div>
+          <button
+            onClick={() => { setShowCreate((v) => !v); setCreateError(null); }}
+            className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl transition-all hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #6366F1, #8B5CF6)", color: "white", fontWeight: 700 }}
+          >
+            <Plus size={13} />
+            Créer un terminal
+          </button>
+        </div>
+
+        {/* Inline create form */}
+        <AnimatePresence>
+          {showCreate && (
+            <motion.form
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              onSubmit={handleCreate}
+              className="mt-4 pt-4 border-t space-y-3"
+              style={{ borderColor: "var(--hr-card-border-hard)" }}
+            >
+              <p className="text-xs font-bold" style={{ color: "var(--hr-text-sec)" }}>Nouveau terminal</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>
+                    Email du terminal <span style={{ color: "#EF4444" }}>*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={createEmail}
+                    onChange={(e) => setCreateEmail(e.target.value)}
+                    placeholder="kiosk-hall@entreprise.com"
+                    required
+                    className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                    style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>
+                    Étiquette (optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    value={createLabel}
+                    onChange={(e) => setCreateLabel(e.target.value)}
+                    placeholder="Ex: Hall d'entrée"
+                    className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                    style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs mb-1.5 block" style={{ color: "var(--hr-text-sec)", fontWeight: 600 }}>
+                  Mot de passe <span style={{ color: "#EF4444" }}>*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showCreatePwd ? "text" : "password"}
+                    value={createPassword}
+                    onChange={(e) => setCreatePassword(e.target.value)}
+                    placeholder="6 caractères minimum"
+                    required
+                    minLength={6}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm outline-none pr-10"
+                    style={{ background: "var(--hr-input-bg)", border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text)" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePwd((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                    style={{ color: "var(--hr-text-muted)" }}
+                  >
+                    {showCreatePwd ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+              {createError && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "#FEE2E2" }}>
+                  <AlertCircle size={13} style={{ color: "#DC2626" }} />
+                  <p className="text-xs" style={{ color: "#DC2626", fontWeight: 600 }}>{createError}</p>
+                </div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => { setShowCreate(false); setCreateError(null); setCreateEmail(""); setCreatePassword(""); setCreateLabel(""); }}
+                  className="px-4 py-2 rounded-xl text-sm"
+                  style={{ border: "1.5px solid var(--hr-card-border-hard)", color: "var(--hr-text-muted)", fontWeight: 600 }}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating || !createEmail.trim() || !createPassword}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm hover:opacity-90 transition-all"
+                  style={{
+                    background: "linear-gradient(135deg, #6366F1, #8B5CF6)",
+                    fontWeight: 700,
+                    opacity: creating || !createEmail.trim() || !createPassword ? 0.6 : 1,
+                  }}
+                >
+                  {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                  {creating ? "Création…" : "Créer"}
+                </button>
+              </div>
+            </motion.form>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Accounts list */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--hr-card-border)" }}>
+          <p className="text-sm font-bold" style={{ color: "var(--hr-text)" }}>
+            Comptes créés ({accounts.length})
+          </p>
+          <button onClick={() => void load()} className="p-1.5 rounded-lg transition-all hover:opacity-70" style={{ color: "var(--hr-text-muted)" }}>
+            <RefreshCw size={14} />
+          </button>
+        </div>
+
+        {accounts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
+            <MonitorSmartphone size={28} style={{ color: "var(--hr-text-light)" }} />
+            <p className="text-sm" style={{ color: "var(--hr-text-muted)" }}>Aucun terminal créé</p>
+            <p className="text-xs" style={{ color: "var(--hr-text-light)" }}>Cliquez sur "Créer un terminal" pour commencer.</p>
+          </div>
+        ) : (
+          <div className="divide-y" style={{ borderColor: "var(--hr-card-border)" }}>
+            {accounts.map((account) => (
+              <div key={account.id} className="flex items-center gap-3 px-5 py-3.5">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: account.isActive ? "rgba(99,102,241,0.1)" : "var(--hr-hover)" }}
+                >
+                  <MonitorSmartphone size={15} style={{ color: account.isActive ? "#6366F1" : "var(--hr-text-muted)" }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate" style={{ color: "var(--hr-text)" }}>
+                    {account.label || account.email}
+                  </p>
+                  {account.label && (
+                    <p className="text-xs truncate" style={{ color: "var(--hr-text-muted)" }}>{account.email}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: account.deviceBound ? "rgba(16,185,129,0.1)" : "rgba(245,158,11,0.1)",
+                        color: account.deviceBound ? "#10B981" : "#F59E0B",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {account.deviceBound ? "Appareil lié" : "Aucun appareil"}
+                    </span>
+                    <span className="text-xs" style={{ color: "var(--hr-text-light)" }}>
+                      Créé le {new Date(account.createdAt).toLocaleDateString("fr-FR")}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {account.deviceBound && (
+                    <button
+                      onClick={() => void handleResetDevice(account.id)}
+                      disabled={resettingId === account.id}
+                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl transition-all hover:opacity-80"
+                      style={{ background: "rgba(245,158,11,0.1)", color: "#D97706", border: "1px solid rgba(245,158,11,0.2)" }}
+                    >
+                      {resettingId === account.id ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                      Réinitialiser
+                    </button>
+                  )}
+                  <button
+                    onClick={() => void handleDelete(account.id)}
+                    disabled={deletingId === account.id}
+                    className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl transition-all hover:opacity-80"
+                    style={{ background: "rgba(239,68,68,0.1)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}
+                  >
+                    {deletingId === account.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -375,7 +654,9 @@ export function SettingsPage() {
           style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)", boxShadow: "var(--hr-shadow)" }}>
           {/* On mobile: horizontal scrollable tabs */}
           <div className="flex md:flex-col overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            {sections.map((s) => (
+            {sections
+              .filter((s) => !s.roles || s.roles.includes(currentUser?.role ?? ""))
+              .map((s) => (
               <button key={s.id} onClick={() => setActiveSection(s.id)}
                 className="flex-shrink-0 md:w-full flex items-center justify-between px-3 md:px-4 py-3 transition-all text-left min-w-[80px] md:min-w-0"
                 style={{
@@ -487,6 +768,11 @@ export function SettingsPage() {
         {/* Devices */}
         {activeSection === "devices" && (
           <DevicesPanel isAdmin={currentUser?.role === "Admin"} />
+        )}
+
+        {/* Kiosk Accounts — Admin only */}
+        {activeSection === "kiosk" && currentUser?.role === "Admin" && (
+          <KioskAccountsPanel />
         )}
 
         {/* Notifications */}

@@ -233,6 +233,34 @@ export const kioskApi = {
     ),
 };
 
+// ─── Kiosk Accounts (Admin management) ──────────────────────────────────────
+export interface KioskAccount {
+  id: number;
+  email: string;
+  label: string | null;
+  deviceBound: boolean;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export const kioskAccountsApi = {
+  list: () => request<KioskAccount[]>("/kiosk/accounts"),
+  create: (data: { email: string; password: string; label?: string }) =>
+    request<KioskAccount>("/kiosk/accounts", { method: "POST", body: JSON.stringify(data) }),
+  delete: (id: number) =>
+    request<{ success: boolean }>(`/kiosk/accounts/${id}`, { method: "DELETE" }),
+  resetDevice: (id: number) =>
+    request<{ success: boolean }>(`/kiosk/accounts/${id}/reset-device`, { method: "PATCH" }),
+};
+
+export const kioskAuthApi = {
+  login: (email: string, password: string, deviceId: string) =>
+    request<{ token: string; kioskId: number; companyId: string; companyName: string; label: string | null }>(
+      "/kiosk/auth/login",
+      { method: "POST", body: JSON.stringify({ email, password, deviceId }) }
+    ),
+};
+
 // ─── Devices ──────────────────────────────────────────────────
 export interface DeviceInfo {
   employeeId: string;

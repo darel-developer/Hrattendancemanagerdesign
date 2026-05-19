@@ -120,3 +120,4 @@ router.post('/change-password', requireAuth, async (req, res) => {
 // Exporte les helpers pour réutilisation dans employees.js
 module.exports = router;
 module.exports.hashPassword = hashPassword;
+module.exports.verifyPassword = verifyPassword;

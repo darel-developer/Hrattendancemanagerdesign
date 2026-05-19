@@ -4,6 +4,22 @@ const router = express.Router();
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { randomUUID } = require('crypto');
+const jwt = require('jsonwebtoken');
+const { hashPassword, verifyPassword } = require('./auth');
+
+const requireKioskAuth = (req, res, next) => {
+  const header = req.headers.authorization;
+  if (!header) return res.status(401).json({ error: 'Authentification kiosk requise' });
+  try {
+    const token = header.split(' ')[1];
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION');
+    if (payload.role !== 'Kiosk') return res.status(403).json({ error: 'Accès kiosk uniquement' });
+    req.kiosk = payload;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Token kiosk invalide ou expiré' });
+  }
+};
 
 // Distance GPS (Haversine) — retourne la distance en mètres
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -39,10 +55,14 @@ router.get('/employees/:companyId', async (req, res) => {
 });
 
 // GET /api/kiosk/token/:companyId — génère un QR token valide 30 secondes
-// (pas d'auth requise — c'est le terminal kiosque public qui appelle ça)
-router.get('/token/:companyId', async (req, res) => {
+// Requiert un JWT kiosk valide et vérifie que le companyId correspond au compte
+router.get('/token/:companyId', requireKioskAuth, async (req, res) => {
   try {
     const { companyId } = req.params;
+
+    if (req.kiosk.companyId !== companyId) {
+      return res.status(403).json({ error: 'Ce compte kiosk n\'est pas autorisé pour cette entreprise' });
+    }
 
     // Vérifier que l'entreprise existe
     const [comp] = await db.query('SELECT id FROM companies WHERE id = ?', [companyId]);
@@ -219,6 +239,123 @@ router.post('/scan', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('[Kiosk] POST /scan', err.message);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ─── POST /api/kiosk/auth/login ────────────────────────────────────────────────
+router.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password, deviceId } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });
+
+    const [rows] = await db.query(
+      'SELECT * FROM kiosk_accounts WHERE LOWER(email) = LOWER(?) AND is_active = TRUE',
+      [email.trim().slice(0, 255)]
+    );
+    if (rows.length === 0) return res.status(401).json({ error: 'Identifiants incorrects' });
+
+    const account = rows[0];
+    const valid = await verifyPassword(password, account.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Identifiants incorrects' });
+
+    // Bind or update device_id on every login (allows re-binding on new device)
+    if (deviceId) {
+      await db.query('UPDATE kiosk_accounts SET device_id = ? WHERE id = ?', [deviceId, account.id]);
+    }
+
+    const [compRows] = await db.query('SELECT name FROM companies WHERE id = ?', [account.company_id]);
+    const companyName = compRows[0]?.name || 'Entreprise';
+
+    const token = jwt.sign(
+      { kioskId: account.id, companyId: account.company_id, role: 'Kiosk', email: account.email },
+      process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION',
+      { expiresIn: '30d' }
+    );
+
+    res.json({ token, kioskId: account.id, companyId: account.company_id, companyName, label: account.label });
+  } catch (err) {
+    console.error('[Kiosk] auth/login:', err.message);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ─── GET /api/kiosk/accounts  (Admin) ─────────────────────────────────────────
+router.get('/accounts', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Réservé aux administrateurs' });
+    const [rows] = await db.query(
+      'SELECT id, email, label, device_id, created_at, is_active FROM kiosk_accounts WHERE company_id = ? ORDER BY created_at DESC',
+      [req.user.companyId]
+    );
+    res.json(rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      label: r.label || null,
+      deviceBound: !!r.device_id,
+      createdAt: r.created_at,
+      isActive: r.is_active,
+    })));
+  } catch (err) {
+    console.error('[Kiosk] GET /accounts:', err.message);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ─── POST /api/kiosk/accounts  (Admin) ────────────────────────────────────────
+router.post('/accounts', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Réservé aux administrateurs' });
+    const { email, password, label } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });
+    if (typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ error: 'Mot de passe trop court (6 caractères minimum)' });
+    }
+    const hash = await hashPassword(password);
+    const [result] = await db.query(
+      'INSERT INTO kiosk_accounts (email, password_hash, company_id, label) VALUES (?, ?, ?, ?)',
+      [email.trim().toLowerCase(), hash, req.user.companyId, label || null]
+    );
+    res.status(201).json({ id: result.insertId, email: email.trim().toLowerCase(), label: label || null, deviceBound: false, isActive: true });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY' || (err.message && err.message.includes('unique'))) {
+      return res.status(409).json({ error: 'Un compte kiosk avec cet email existe déjà' });
+    }
+    console.error('[Kiosk] POST /accounts:', err.message);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ─── DELETE /api/kiosk/accounts/:id  (Admin) ─────────────────────────────────
+router.delete('/accounts/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Réservé aux administrateurs' });
+    const [rows] = await db.query(
+      'SELECT id FROM kiosk_accounts WHERE id = ? AND company_id = ?',
+      [req.params.id, req.user.companyId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Compte introuvable' });
+    await db.query('DELETE FROM kiosk_accounts WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Kiosk] DELETE /accounts/:id:', err.message);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ─── PATCH /api/kiosk/accounts/:id/reset-device  (Admin) ─────────────────────
+router.patch('/accounts/:id/reset-device', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Réservé aux administrateurs' });
+    const [rows] = await db.query(
+      'SELECT id FROM kiosk_accounts WHERE id = ? AND company_id = ?',
+      [req.params.id, req.user.companyId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Compte introuvable' });
+    await db.query('UPDATE kiosk_accounts SET device_id = NULL WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Kiosk] PATCH /accounts/:id/reset-device:', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
