@@ -4,3 +4,4 @@ node_modules
 backups
 *.log
 .git
+firebase-service-account.json

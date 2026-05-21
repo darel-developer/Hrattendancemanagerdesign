@@ -117,6 +117,26 @@ router.post('/change-password', requireAuth, async (req, res) => {
   }
 });
 
+// ─── PUT /auth/fcm-token — enregistre le token FCM web push de l'utilisateur ──
+router.put('/fcm-token', requireAuth, async (req, res) => {
+  try {
+    const { token, platform = 'web' } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token requis' });
+    const validPlatforms = ['web', 'android', 'ios'];
+    const p = validPlatforms.includes(platform) ? platform : 'web';
+    await db.query(
+      `INSERT INTO push_tokens (employee_id, token, platform, updated_at)
+       VALUES (?, ?, ?, NOW())
+       ON CONFLICT (employee_id, platform) DO UPDATE SET token = EXCLUDED.token, updated_at = NOW()`,
+      [req.user.id, token, p]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[FCM] Enregistrement token :', err.message);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // Exporte les helpers pour réutilisation dans employees.js
 module.exports = router;
 module.exports.hashPassword = hashPassword;

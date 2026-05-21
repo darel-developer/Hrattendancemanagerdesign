@@ -22,6 +22,7 @@ const performanceRouter = require('./routes/performance');
 const documentsRouter = require('./routes/documents');
 const planningRouter = require('./routes/planning');
 const db = require('./db');
+const { initFCM, sendPush } = require('./services/fcm');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -142,14 +143,14 @@ async function generateDailyAbsenceNotifications() {
          AND DATE(date) = ? LIMIT 1`, [emp.id, today]
       );
       if (existing.length === 0) {
+        const absTitle = `Absence non justifiée — ${emp.first_name} ${emp.last_name}`;
+        const absMsg = `${emp.first_name} ${emp.last_name} n'a pas pointé son arrivée aujourd'hui (${today}).`;
         await db.query(
           `INSERT INTO notifications (id, type, title, message, date, is_read, employee_id)
            VALUES (?, 'absence', ?, ?, NOW(), FALSE, ?)`,
-          [notifId(),
-           `Absence non justifiée — ${emp.first_name} ${emp.last_name}`,
-           `${emp.first_name} ${emp.last_name} n'a pas pointé son arrivée aujourd'hui (${today}).`,
-           emp.id]
+          [notifId(), absTitle, absMsg, emp.id]
         );
+        sendPush(emp.id, absTitle, absMsg);
         absenceCount++;
       }
     }
@@ -195,14 +196,14 @@ async function generateMonthlyReport() {
       );
 
       for (const admin of admins) {
+        const repTitle = `Rapport mensuel — ${monthLabel}`;
+        const repMsg = `${company.name} : ${employees.length} employé(s) actifs · Taux de présence : ${taux}% · Absences : ${absents} · Retards : ${retards}`;
         await db.query(
           `INSERT INTO notifications (id, type, title, message, date, is_read, employee_id)
            VALUES (?, 'system', ?, ?, NOW(), FALSE, ?)`,
-          [notifId(),
-           `Rapport mensuel — ${monthLabel}`,
-           `${company.name} : ${employees.length} employé(s) actifs · Taux de présence : ${taux}% · Absences : ${absents} · Retards : ${retards}`,
-           admin.id]
+          [notifId(), repTitle, repMsg, admin.id]
         );
+        sendPush(admin.id, repTitle, repMsg);
       }
     }
     console.log(`[Auto] Rapport mensuel ${monthLabel} envoyé`);
@@ -342,6 +343,22 @@ app.listen(PORT, async () => {
   } catch (err) {
     console.error('[DB] Erreur table kiosk_tokens :', err.message);
   }
+  // ── Tokens FCM push web ─────────────────────────────────────────────────────
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id          SERIAL PRIMARY KEY,
+        employee_id VARCHAR(50)  NOT NULL,
+        token       TEXT         NOT NULL,
+        platform    VARCHAR(20)  DEFAULT 'web',
+        updated_at  TIMESTAMP    DEFAULT NOW(),
+        UNIQUE (employee_id, platform)
+      )
+    `);
+    console.log('[DB] Table push_tokens prête');
+  } catch (err) {
+    console.error('[DB] Erreur table push_tokens :', err.message);
+  }
   // ── Comptes kiosk (terminaux nommés par l'admin) ────────────────────────────
   try {
     await db.query(`
@@ -387,6 +404,9 @@ app.listen(PORT, async () => {
   } catch (err) {
     console.error('[DB] Erreur migration work_days :', err.message);
   }
+  // ── Firebase Cloud Messaging ────────────────────────────────────────────────
+  initFCM();
+
   // Corriger les statuts de pointage du jour mal enregistrés
   recalculateTodayAttendanceStatuses().catch((err) => console.error('[Auto] Recalcul statuts :', err.message));
 

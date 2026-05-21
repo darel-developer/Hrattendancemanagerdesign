@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { sendPush } = require('../services/fcm');
 
 function mapNotif(row) {
   const dateStr = row.date ? String(row.date).replace(' ', 'T') : null;
@@ -29,7 +30,9 @@ router.post('/', async (req, res) => {
       [id, type, String(n.title).slice(0, 255), String(n.message).slice(0, 1000), n.employeeId || null]
     );
     const [rows] = await db.query('SELECT * FROM notifications WHERE id = ?', [id]);
-    res.status(201).json(mapNotif(rows[0]));
+    const notif = mapNotif(rows[0]);
+    if (n.employeeId) sendPush(n.employeeId, notif.title, notif.message);
+    res.status(201).json(notif);
   } catch {
     res.status(500).json({ error: 'Erreur serveur' });
   }
