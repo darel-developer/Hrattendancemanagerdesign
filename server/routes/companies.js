@@ -16,6 +16,7 @@ function mapCompany(row) {
     latitude: row.latitude !== null && row.latitude !== undefined ? parseFloat(row.latitude) : null,
     longitude: row.longitude !== null && row.longitude !== undefined ? parseFloat(row.longitude) : null,
     geoRadius: row.geo_radius !== null && row.geo_radius !== undefined ? parseInt(row.geo_radius) : 100,
+    isBlocked: row.is_blocked === true || row.is_blocked === 1 || row.is_blocked === 't',
   };
 }
 

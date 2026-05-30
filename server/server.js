@@ -64,7 +64,7 @@ const corsOptions = {
     cb(new Error(`Origine non autorisée: ${origin}`));
   },
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-superadmin-password'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   optionsSuccessStatus: 200,
 };
