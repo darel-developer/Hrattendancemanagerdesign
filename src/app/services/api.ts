@@ -211,45 +211,20 @@ export const authApi = {
 // ─── Super Admin ──────────────────────────────────────────────
 export const superAdminApi = {
   verify: (password: string) =>
-    request<{ valid: boolean }>("/superadmin/verify", {
+    request<{ valid: boolean; token: string }>("/superadmin/verify", {
       method: "POST",
       body: JSON.stringify({ password }),
     }),
   createCompany: (company: { id: string; name: string; sector?: string; address?: string; hrEmail?: string; workStart?: string; lateTolerance?: number }) =>
     request<Company>("/companies", { method: "POST", body: JSON.stringify(company) }),
-  deleteCompany: (id: string, superAdminPassword: string) =>
-    request<{ success: boolean; deletedEmployees: number }>(`/superadmin/companies/${id}`, {
-      method: "DELETE",
-      headers: { "x-superadmin-password": superAdminPassword },
-    }),
-  blockCompany: (id: string, superAdminPassword: string) =>
-    request<{ success: boolean; emailsSent: number }>(`/superadmin/companies/${id}/block`, {
-      method: "PATCH",
-      headers: { "x-superadmin-password": superAdminPassword },
-    }),
-  unblockCompany: (id: string, superAdminPassword: string) =>
-    request<{ success: boolean }>(`/superadmin/companies/${id}/unblock`, {
-      method: "PATCH",
-      headers: { "x-superadmin-password": superAdminPassword },
-    }),
+  deleteCompany: (id: string) =>
+    request<{ success: boolean; deletedEmployees: number }>(`/superadmin/companies/${id}`, { method: "DELETE" }),
+  blockCompany: (id: string) =>
+    request<{ success: boolean; emailsSent: number }>(`/superadmin/companies/${id}/block`, { method: "PATCH" }),
+  unblockCompany: (id: string) =>
+    request<{ success: boolean }>(`/superadmin/companies/${id}/unblock`, { method: "PATCH" }),
   getAdmins: (companyId: string) =>
     request<Employee[]>(`/employees?companyId=${companyId}&role=Admin`),
-  // Appels employés depuis le contexte superadmin (pas de JWT — utilise x-superadmin-password)
-  saGetEmployees: (companyId: string, pwd: string) =>
-    request<Employee[]>(`/employees?companyId=${companyId}&role=Admin`, {
-      headers: { "x-superadmin-password": pwd },
-    }),
-  saCreateEmployee: (emp: Employee & { password?: string; pin?: string }, pwd: string) =>
-    request<Employee>("/employees", {
-      method: "POST",
-      body: JSON.stringify(emp),
-      headers: { "x-superadmin-password": pwd },
-    }),
-  saDeleteEmployee: (id: string, pwd: string) =>
-    request<{ success: boolean }>(`/employees/${id}`, {
-      method: "DELETE",
-      headers: { "x-superadmin-password": pwd },
-    }),
 };
 
 // ─── Kiosk ────────────────────────────────────────────────────

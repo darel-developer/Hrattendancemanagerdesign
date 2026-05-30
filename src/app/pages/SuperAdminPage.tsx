@@ -4,7 +4,7 @@ import {
   Shield, Building2, Users, Plus, Trash2, Edit2, X, Eye, EyeOff,
   Lock, LogOut, AlertCircle, Mail, Ban, CheckCircle2, AlertTriangle
 } from "lucide-react";
-import { superAdminApi, companiesApi, employeesApi } from "../services/api";
+import { superAdminApi, companiesApi, employeesApi, setAuthToken } from "../services/api";
 import { Company, Employee } from "../data/mockData";
 
 const SESSION_KEY = "hr_superadmin"; // stores the password for use in API calls
@@ -23,8 +23,9 @@ function SuperAdminLogin({ onLogin }: { onLogin: () => void }) {
     setLoading(true);
     setError("");
     try {
-      await superAdminApi.verify(password);
-      sessionStorage.setItem(SESSION_KEY, password); // stored for authenticated API calls
+      const { token } = await superAdminApi.verify(password);
+      sessionStorage.setItem(SESSION_KEY, token);
+      setAuthToken(token);
       onLogin();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
@@ -234,7 +235,7 @@ function CompanyModal({
 }
 
 // ─── Admin manager modal ──────────────────────────────────────
-function AdminModal({ company, onClose, superAdminPwd }: { company: CompanyWithCounts; onClose: () => void; superAdminPwd: string }) {
+function AdminModal({ company, onClose }: { company: CompanyWithCounts; onClose: () => void }) {
   const [admins, setAdmins] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -244,7 +245,7 @@ function AdminModal({ company, onClose, superAdminPwd }: { company: CompanyWithC
 
   const loadAdmins = () => {
     setLoading(true);
-    superAdminApi.saGetEmployees(company.id, superAdminPwd)
+    superAdminApi.getAdmins(company.id)
       .then(setAdmins)
       .finally(() => setLoading(false));
   };
@@ -260,7 +261,7 @@ function AdminModal({ company, onClose, superAdminPwd }: { company: CompanyWithC
     setError("");
     try {
       const newId = `EMP${Date.now().toString().slice(-6)}`;
-      await superAdminApi.saCreateEmployee({
+      await employeesApi.create({
         id: newId,
         companyId: company.id,
         firstName: form.firstName,
@@ -282,7 +283,7 @@ function AdminModal({ company, onClose, superAdminPwd }: { company: CompanyWithC
         leaveUsed: 0,
         password: form.password,
         pin: form.pin,
-      }, superAdminPwd);
+      });
       setShowForm(false);
       setForm({ firstName: "", lastName: "", email: "", phone: "", password: "", pin: "1234" });
       loadAdmins();
@@ -295,7 +296,7 @@ function AdminModal({ company, onClose, superAdminPwd }: { company: CompanyWithC
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Supprimer cet administrateur ?")) return;
-    await superAdminApi.saDeleteEmployee(id, superAdminPwd);
+    await employeesApi.delete(id);
     setAdmins((p) => p.filter((a) => a.id !== id));
   };
 
@@ -440,7 +441,6 @@ function AdminModal({ company, onClose, superAdminPwd }: { company: CompanyWithC
 
 // ─── Dashboard principal ──────────────────────────────────────
 function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
-  const superAdminPwd = sessionStorage.getItem(SESSION_KEY) ?? "";
   const [companies, setCompanies] = useState<CompanyWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCompanyModal, setShowCompanyModal] = useState<CompanyWithCounts | null | "new">(null);
@@ -469,7 +469,7 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
   const handleDeleteCompany = async (id: string) => {
     setActionLoading(id);
     try {
-      await superAdminApi.deleteCompany(id, superAdminPwd);
+      await superAdminApi.deleteCompany(id);
       setDeleteConfirm(null);
       loadCompanies();
     } finally {
@@ -482,9 +482,9 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
     setActionLoading(blockConfirm.id);
     try {
       if (blockConfirm.action === "block") {
-        await superAdminApi.blockCompany(blockConfirm.id, superAdminPwd);
+        await superAdminApi.blockCompany(blockConfirm.id);
       } else {
-        await superAdminApi.unblockCompany(blockConfirm.id, superAdminPwd);
+        await superAdminApi.unblockCompany(blockConfirm.id);
       }
       setBlockConfirm(null);
       loadCompanies();
@@ -510,7 +510,7 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
           />
         )}
         {showAdminModal && (
-          <AdminModal company={showAdminModal} superAdminPwd={superAdminPwd} onClose={() => { setShowAdminModal(null); loadCompanies(); }} />
+          <AdminModal company={showAdminModal} onClose={() => { setShowAdminModal(null); loadCompanies(); }} />
         )}
       </AnimatePresence>
 
@@ -789,12 +789,14 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
 // ─── Export principal ─────────────────────────────────────────
 export function SuperAdminPage() {
   const [authenticated, setAuthenticated] = useState(() => {
-    const s = sessionStorage.getItem(SESSION_KEY);
-    return !!s && s.length > 0;
+    const token = sessionStorage.getItem(SESSION_KEY);
+    if (token) setAuthToken(token); // restaure le JWT pour les appels API
+    return !!token;
   });
 
   const handleLogout = () => {
     sessionStorage.removeItem(SESSION_KEY);
+    setAuthToken(null);
     setAuthenticated(false);
   };
 

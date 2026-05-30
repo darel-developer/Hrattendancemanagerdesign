@@ -3,16 +3,21 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const jwt = require('jsonwebtoken');
 
-const SUPER_PWD = () => process.env.SUPER_ADMIN_PASSWORD || 'superadmin2024';
+const SUPER_PWD    = () => process.env.SUPER_ADMIN_PASSWORD || 'superadmin2024';
+const JWT_SECRET   = () => process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION';
 
 // ─── Middleware superadmin ────────────────────────────────────────────────────
+const { requireAuth } = require('../middleware/auth');
+
 function requireSuperAdmin(req, res, next) {
-  const pwd = req.headers['x-superadmin-password'];
-  if (!pwd || pwd !== SUPER_PWD()) {
-    return res.status(401).json({ error: 'Authentification superadmin requise' });
-  }
-  next();
+  requireAuth(req, res, () => {
+    if (!req.user?.isSuperAdmin) {
+      return res.status(403).json({ error: 'Accès superadmin uniquement' });
+    }
+    next();
+  });
 }
 
 // ─── Email helper (nodemailer optionnel) ──────────────────────────────────────
@@ -51,14 +56,18 @@ async function sendEmail(to, subject, html) {
   }
 }
 
-// ─── POST /superadmin/verify ──────────────────────────────────────────────────
+// ─── POST /superadmin/verify — retourne un JWT superadmin ────────────────────
 router.post('/verify', (req, res) => {
   const { password } = req.body;
-  if (password === SUPER_PWD()) {
-    res.json({ valid: true });
-  } else {
-    res.status(401).json({ valid: false, error: 'Mot de passe incorrect' });
+  if (password !== SUPER_PWD()) {
+    return res.status(401).json({ valid: false, error: 'Mot de passe incorrect' });
   }
+  const token = jwt.sign(
+    { id: 'superadmin', role: 'Admin', companyId: null, isSuperAdmin: true },
+    JWT_SECRET(),
+    { expiresIn: '8h' }
+  );
+  res.json({ valid: true, token });
 });
 
 // ─── PATCH /superadmin/companies/:id/block ────────────────────────────────────
