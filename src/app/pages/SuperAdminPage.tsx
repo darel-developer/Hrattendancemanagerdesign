@@ -234,7 +234,7 @@ function CompanyModal({
 }
 
 // ─── Admin manager modal ──────────────────────────────────────
-function AdminModal({ company, onClose }: { company: CompanyWithCounts; onClose: () => void }) {
+function AdminModal({ company, onClose, superAdminPwd }: { company: CompanyWithCounts; onClose: () => void; superAdminPwd: string }) {
   const [admins, setAdmins] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -244,7 +244,7 @@ function AdminModal({ company, onClose }: { company: CompanyWithCounts; onClose:
 
   const loadAdmins = () => {
     setLoading(true);
-    superAdminApi.getAdmins(company.id)
+    superAdminApi.saGetEmployees(company.id, superAdminPwd)
       .then(setAdmins)
       .finally(() => setLoading(false));
   };
@@ -260,7 +260,7 @@ function AdminModal({ company, onClose }: { company: CompanyWithCounts; onClose:
     setError("");
     try {
       const newId = `EMP${Date.now().toString().slice(-6)}`;
-      await employeesApi.create({
+      await superAdminApi.saCreateEmployee({
         id: newId,
         companyId: company.id,
         firstName: form.firstName,
@@ -282,7 +282,7 @@ function AdminModal({ company, onClose }: { company: CompanyWithCounts; onClose:
         leaveUsed: 0,
         password: form.password,
         pin: form.pin,
-      });
+      }, superAdminPwd);
       setShowForm(false);
       setForm({ firstName: "", lastName: "", email: "", phone: "", password: "", pin: "1234" });
       loadAdmins();
@@ -295,7 +295,7 @@ function AdminModal({ company, onClose }: { company: CompanyWithCounts; onClose:
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Supprimer cet administrateur ?")) return;
-    await employeesApi.delete(id);
+    await superAdminApi.saDeleteEmployee(id, superAdminPwd);
     setAdmins((p) => p.filter((a) => a.id !== id));
   };
 
@@ -510,7 +510,7 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
           />
         )}
         {showAdminModal && (
-          <AdminModal company={showAdminModal} onClose={() => { setShowAdminModal(null); loadCompanies(); }} />
+          <AdminModal company={showAdminModal} superAdminPwd={superAdminPwd} onClose={() => { setShowAdminModal(null); loadCompanies(); }} />
         )}
       </AnimatePresence>
 

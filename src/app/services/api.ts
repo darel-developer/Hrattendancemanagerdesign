@@ -234,6 +234,22 @@ export const superAdminApi = {
     }),
   getAdmins: (companyId: string) =>
     request<Employee[]>(`/employees?companyId=${companyId}&role=Admin`),
+  // Appels employés depuis le contexte superadmin (pas de JWT — utilise x-superadmin-password)
+  saGetEmployees: (companyId: string, pwd: string) =>
+    request<Employee[]>(`/employees?companyId=${companyId}&role=Admin`, {
+      headers: { "x-superadmin-password": pwd },
+    }),
+  saCreateEmployee: (emp: Employee & { password?: string; pin?: string }, pwd: string) =>
+    request<Employee>("/employees", {
+      method: "POST",
+      body: JSON.stringify(emp),
+      headers: { "x-superadmin-password": pwd },
+    }),
+  saDeleteEmployee: (id: string, pwd: string) =>
+    request<{ success: boolean }>(`/employees/${id}`, {
+      method: "DELETE",
+      headers: { "x-superadmin-password": pwd },
+    }),
 };
 
 // ─── Kiosk ────────────────────────────────────────────────────

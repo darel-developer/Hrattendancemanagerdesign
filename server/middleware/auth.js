@@ -3,12 +3,21 @@
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = () => process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION';
+const SUPER_PWD  = () => process.env.SUPER_ADMIN_PASSWORD || 'superadmin2024';
 
 /**
  * Vérifie le Bearer token JWT et injecte req.user.
- * Retourne 401 si absent ou invalide, 401 {expired:true} si expiré.
+ * Accepte aussi x-superadmin-password comme authentification alternative
+ * pour les opérations effectuées depuis le panneau super-admin.
  */
 function requireAuth(req, res, next) {
+  // Bypass superadmin — mot de passe dans l'en-tête x-superadmin-password
+  const superPwd = req.headers['x-superadmin-password'];
+  if (superPwd && superPwd === SUPER_PWD()) {
+    req.user = { id: 'superadmin', role: 'Admin', companyId: null, isSuperAdmin: true };
+    return next();
+  }
+
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authentification requise' });
@@ -46,6 +55,9 @@ function requireRole(...roles) {
  */
 function checkCompany(req, res, next) {
   if (!req.user) return res.status(401).json({ error: 'Non authentifié' });
+
+  // Le superadmin a accès à toutes les entreprises
+  if (req.user.isSuperAdmin) return next();
 
   // Cherche companyId dans query, body ou params
   const requested =
