@@ -201,6 +201,11 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ employeeId, currentPassword, newPassword }),
     }),
+  registerFcmToken: (token: string) =>
+    request<{ success: boolean }>("/auth/fcm-token", {
+      method: "PUT",
+      body: JSON.stringify({ token }),
+    }),
 };
 
 // ─── Super Admin ──────────────────────────────────────────────

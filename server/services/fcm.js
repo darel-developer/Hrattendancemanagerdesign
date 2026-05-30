@@ -30,7 +30,12 @@ async function sendPush(employeeId, title, body) {
       'SELECT token, platform FROM push_tokens WHERE employee_id = ?',
       [employeeId]
     );
-    if (!rows.length) return;
+    if (!rows.length) {
+      console.log(`[FCM] sendPush → aucun token enregistré pour employé ${employeeId}`);
+      return;
+    }
+
+    console.log(`[FCM] sendPush → ${rows.length} appareil(s) pour ${employeeId} | "${title}"`);
 
     const sends = rows.map(({ token, platform }) => {
       const msg = {
@@ -45,19 +50,23 @@ async function sendPush(employeeId, title, body) {
           android: { notification: { icon: 'ic_notification', color: '#6366F1' } },
         }),
       };
-      return messaging.send(msg).catch(async (err) => {
-        if (err.code === 'messaging/registration-token-not-registered' ||
-            err.code === 'messaging/invalid-registration-token') {
-          await db.query(
-            'DELETE FROM push_tokens WHERE token = ?', [token]
-          ).catch(() => {});
-        }
-      });
+      return messaging.send(msg)
+        .then((msgId) => {
+          console.log(`[FCM] ✓ Push envoyé (${platform}) → messageId: ${msgId}`);
+        })
+        .catch(async (err) => {
+          console.error(`[FCM] ✗ Échec push (${platform}) pour ${employeeId} :`, err.code || err.message);
+          if (err.code === 'messaging/registration-token-not-registered' ||
+              err.code === 'messaging/invalid-registration-token') {
+            console.log(`[FCM] Token invalide supprimé pour ${employeeId} (${platform})`);
+            await db.query('DELETE FROM push_tokens WHERE token = ?', [token]).catch(() => {});
+          }
+        });
     });
 
     await Promise.allSettled(sends);
-  } catch {
-    // Non-blocking — push est best-effort
+  } catch (err) {
+    console.error('[FCM] sendPush erreur inattendue :', err.message);
   }
 }
 

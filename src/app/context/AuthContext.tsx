@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { Employee, Company } from "../data/mockData";
 import { employeesApi, authApi, companiesApi, devicesApi, setAuthToken } from "../services/api";
 import { getDeviceId, getDeviceName } from "../utils/deviceId";
+import { useFcm } from "../hooks/useFcm";
 
 export type LoginResult = true | "device_conflict" | "device_new" | false;
 
@@ -29,6 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
+  const isAuthenticated = !!currentUser;
+  useFcm(isAuthenticated);
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -154,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       currentUser, currentCompany, login, logout,
-      isAuthenticated: !!currentUser, loading,
+      isAuthenticated, loading,
       employees, addEmployee, updateEmployee, deleteEmployee,
       changePassword, refreshCompany,
     }}>
