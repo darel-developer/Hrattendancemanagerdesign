@@ -1,10 +1,54 @@
+# ─── Dépendances ─────────────────────────────────────────────
 node_modules/
 server/node_modules/
+
+# ─── Build ───────────────────────────────────────────────────
 dist/
+build/
+.output/
+
+# ─── Variables d'environnement ───────────────────────────────
 .env
+.env.*
 server/.env
 *.local
+
+# ─── Clés et secrets ─────────────────────────────────────────
+server/firebase-service-account.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ─── Logs ────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# ─── Backups serveur ─────────────────────────────────────────
+server/backups/
+
+# ─── Claude Code (worktrees, sessions, settings locaux) ──────
+.claude/worktrees/
+.claude/settings.local.json
+
+# ─── Système d'exploitation ──────────────────────────────────
 .DS_Store
 Thumbs.db
-server/backups/
-server/firebase-service-account.json
+desktop.ini
+$RECYCLE.BIN/
+
+# ─── Éditeurs ────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Cache outils ────────────────────────────────────────────
+.cache/
+.parcel-cache/
+.turbo/
+.eslintcache
+.stylelintcache
