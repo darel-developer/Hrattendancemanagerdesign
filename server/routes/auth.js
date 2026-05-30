@@ -70,6 +70,18 @@ router.post('/login', async (req, res) => {
     const valid = await verifyPassword(password, emp.password_hash);
     if (!valid) return res.status(401).json(FAIL);
 
+    // Vérifier si l'entreprise est bloquée
+    if (emp.company_id) {
+      const [compRows] = await db.query('SELECT is_blocked FROM companies WHERE id = ?', [emp.company_id]);
+      if (compRows[0]?.is_blocked) {
+        return res.status(403).json({
+          error: 'Accès suspendu',
+          blocked: true,
+          message: "L'accès de votre organisation a été suspendu pour défaut de paiement. Contactez support@hrmanager.app.",
+        });
+      }
+    }
+
     // Auto-upgrade silencieux SHA-256 → bcrypt
     if (bcrypt && !isBcryptHash(emp.password_hash)) {
       try {

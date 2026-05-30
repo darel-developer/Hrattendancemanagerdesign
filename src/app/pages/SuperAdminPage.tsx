@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Shield, Building2, Users, Plus, Trash2, Edit2, X, Eye, EyeOff,
-  Lock, LogOut, CheckCircle, AlertCircle, ChevronRight, Mail, Phone, Globe
+  Lock, LogOut, AlertCircle, Mail, Ban, CheckCircle2, AlertTriangle
 } from "lucide-react";
 import { superAdminApi, companiesApi, employeesApi } from "../services/api";
 import { Company, Employee } from "../data/mockData";
 
-const SESSION_KEY = "hr_superadmin";
+const SESSION_KEY = "hr_superadmin"; // stores the password for use in API calls
 
 type CompanyWithCounts = Company & { employeeCount?: number; adminCount?: number };
 
@@ -24,7 +24,7 @@ function SuperAdminLogin({ onLogin }: { onLogin: () => void }) {
     setError("");
     try {
       await superAdminApi.verify(password);
-      sessionStorage.setItem(SESSION_KEY, "1");
+      sessionStorage.setItem(SESSION_KEY, password); // stored for authenticated API calls
       onLogin();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
@@ -440,11 +440,14 @@ function AdminModal({ company, onClose }: { company: CompanyWithCounts; onClose:
 
 // ─── Dashboard principal ──────────────────────────────────────
 function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
+  const superAdminPwd = sessionStorage.getItem(SESSION_KEY) ?? "";
   const [companies, setCompanies] = useState<CompanyWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCompanyModal, setShowCompanyModal] = useState<CompanyWithCounts | null | "new">(null);
   const [showAdminModal, setShowAdminModal] = useState<CompanyWithCounts | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [blockConfirm, setBlockConfirm] = useState<{ id: string; name: string; action: "block" | "unblock" } | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const loadCompanies = () => {
     setLoading(true);
@@ -464,9 +467,30 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
   };
 
   const handleDeleteCompany = async (id: string) => {
-    await superAdminApi.deleteCompany(id);
-    setDeleteConfirm(null);
-    loadCompanies();
+    setActionLoading(id);
+    try {
+      await superAdminApi.deleteCompany(id, superAdminPwd);
+      setDeleteConfirm(null);
+      loadCompanies();
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleBlockToggle = async () => {
+    if (!blockConfirm) return;
+    setActionLoading(blockConfirm.id);
+    try {
+      if (blockConfirm.action === "block") {
+        await superAdminApi.blockCompany(blockConfirm.id, superAdminPwd);
+      } else {
+        await superAdminApi.unblockCompany(blockConfirm.id, superAdminPwd);
+      }
+      setBlockConfirm(null);
+      loadCompanies();
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const totalEmployees = companies.reduce((s, c) => s + (c.employeeCount ?? 0), 0);
@@ -490,6 +514,70 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
         )}
       </AnimatePresence>
 
+      {/* Block / Unblock confirm */}
+      <AnimatePresence>
+        {blockConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.7)" }}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}
+              className="rounded-3xl p-8 max-w-sm w-full text-center"
+              style={{ background: "#1E1B4B", border: "1px solid rgba(255,255,255,0.12)" }}>
+              {blockConfirm.action === "block" ? (
+                <>
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                    style={{ background: "rgba(239,68,68,0.2)" }}>
+                    <Ban size={24} style={{ color: "#FCA5A5" }} />
+                  </div>
+                  <h3 className="text-white text-lg mb-2" style={{ fontWeight: 800 }}>Bloquer l'accès ?</h3>
+                  <p className="text-sm mb-2" style={{ color: "#94A3B8" }}>
+                    L'accès de <strong className="text-white">{blockConfirm.name}</strong> sera immédiatement suspendu.
+                  </p>
+                  <p className="text-sm mb-6" style={{ color: "#94A3B8" }}>
+                    Un email sera envoyé aux administrateurs pour les informer de la suspension.
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setBlockConfirm(null)}
+                      className="flex-1 py-3 rounded-2xl text-sm"
+                      style={{ border: "1px solid rgba(255,255,255,0.12)", color: "#94A3B8", fontWeight: 600 }}>
+                      Annuler
+                    </button>
+                    <button onClick={handleBlockToggle} disabled={!!actionLoading}
+                      className="flex-1 py-3 rounded-2xl text-white text-sm flex items-center justify-center gap-2"
+                      style={{ background: "#EF4444", fontWeight: 700, opacity: actionLoading ? 0.7 : 1 }}>
+                      {actionLoading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Ban size={14} /> Bloquer</>}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                    style={{ background: "rgba(16,185,129,0.2)" }}>
+                    <CheckCircle2 size={24} style={{ color: "#6EE7B7" }} />
+                  </div>
+                  <h3 className="text-white text-lg mb-2" style={{ fontWeight: 800 }}>Rétablir l'accès ?</h3>
+                  <p className="text-sm mb-6" style={{ color: "#94A3B8" }}>
+                    L'entreprise <strong className="text-white">{blockConfirm.name}</strong> retrouvera un accès complet à la plateforme.
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setBlockConfirm(null)}
+                      className="flex-1 py-3 rounded-2xl text-sm"
+                      style={{ border: "1px solid rgba(255,255,255,0.12)", color: "#94A3B8", fontWeight: 600 }}>
+                      Annuler
+                    </button>
+                    <button onClick={handleBlockToggle} disabled={!!actionLoading}
+                      className="flex-1 py-3 rounded-2xl text-white text-sm flex items-center justify-center gap-2"
+                      style={{ background: "#10B981", fontWeight: 700, opacity: actionLoading ? 0.7 : 1 }}>
+                      {actionLoading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><CheckCircle2 size={14} /> Débloquer</>}
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Delete confirm */}
       <AnimatePresence>
         {deleteConfirm && (
@@ -501,11 +589,14 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
               style={{ background: "#1E1B4B", border: "1px solid rgba(255,255,255,0.12)" }}>
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
                 style={{ background: "rgba(239,68,68,0.2)" }}>
-                <Trash2 size={24} style={{ color: "#FCA5A5" }} />
+                <AlertTriangle size={24} style={{ color: "#FCA5A5" }} />
               </div>
-              <h3 className="text-white text-lg mb-2" style={{ fontWeight: 800 }}>Supprimer l'entreprise ?</h3>
+              <h3 className="text-white text-lg mb-2" style={{ fontWeight: 800 }}>Supprimer définitivement ?</h3>
+              <p className="text-sm mb-2" style={{ color: "#94A3B8" }}>
+                Cette action est <strong className="text-red-400">irréversible</strong>.
+              </p>
               <p className="text-sm mb-6" style={{ color: "#94A3B8" }}>
-                Tous les employés et données associées seront supprimés définitivement.
+                Tous les employés, pointages, congés et données associées seront effacés pour toujours.
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setDeleteConfirm(null)}
@@ -513,10 +604,10 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
                   style={{ border: "1px solid rgba(255,255,255,0.12)", color: "#94A3B8", fontWeight: 600 }}>
                   Annuler
                 </button>
-                <button onClick={() => handleDeleteCompany(deleteConfirm!)}
-                  className="flex-1 py-3 rounded-2xl text-white text-sm"
-                  style={{ background: "#EF4444", fontWeight: 700 }}>
-                  Supprimer
+                <button onClick={() => handleDeleteCompany(deleteConfirm!)} disabled={!!actionLoading}
+                  className="flex-1 py-3 rounded-2xl text-white text-sm flex items-center justify-center gap-2"
+                  style={{ background: "#EF4444", fontWeight: 700, opacity: actionLoading ? 0.7 : 1 }}>
+                  {actionLoading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Trash2 size={14} /> Supprimer</>}
                 </button>
               </div>
             </motion.div>
@@ -596,12 +687,22 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
               <motion.div key={company.id}
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
                 className="rounded-3xl p-6"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                style={{
+                  background: company.isBlocked ? "rgba(239,68,68,0.06)" : "rgba(255,255,255,0.04)",
+                  border: company.isBlocked ? "1px solid rgba(239,68,68,0.25)" : "1px solid rgba(255,255,255,0.08)",
+                }}>
                 <div className="flex items-center gap-5">
                   {/* Company icon */}
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))", border: "1px solid rgba(99,102,241,0.3)" }}>
-                    <Building2 size={22} style={{ color: "#A5B4FC" }} />
+                    style={{
+                      background: company.isBlocked
+                        ? "rgba(239,68,68,0.2)"
+                        : "linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))",
+                      border: company.isBlocked ? "1px solid rgba(239,68,68,0.3)" : "1px solid rgba(99,102,241,0.3)",
+                    }}>
+                    {company.isBlocked
+                      ? <Ban size={22} style={{ color: "#FCA5A5" }} />
+                      : <Building2 size={22} style={{ color: "#A5B4FC" }} />}
                   </div>
 
                   {/* Info */}
@@ -611,6 +712,12 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
                       <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.2)", color: "#A5B4FC" }}>
                         {company.id}
                       </span>
+                      {company.isBlocked && (
+                        <span className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1"
+                          style={{ background: "rgba(239,68,68,0.2)", color: "#FCA5A5", fontWeight: 700 }}>
+                          <Ban size={10} /> BLOQUÉ
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs mt-0.5" style={{ color: "#94A3B8" }}>
                       {company.sector} {company.address ? `· ${company.address}` : ""}
@@ -631,7 +738,7 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                     <button onClick={() => setShowAdminModal(company)}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs transition-all hover:opacity-80"
                       style={{ background: "rgba(236,72,153,0.15)", color: "#F9A8D4", fontWeight: 600, border: "1px solid rgba(236,72,153,0.2)" }}>
@@ -642,6 +749,23 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
                       style={{ background: "rgba(99,102,241,0.15)", color: "#A5B4FC", fontWeight: 600, border: "1px solid rgba(99,102,241,0.2)" }}>
                       <Edit2 size={13} /> Modifier
                     </button>
+                    {company.isBlocked ? (
+                      <button
+                        onClick={() => setBlockConfirm({ id: company.id, name: company.name, action: "unblock" })}
+                        disabled={actionLoading === company.id}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs transition-all hover:opacity-80"
+                        style={{ background: "rgba(16,185,129,0.15)", color: "#6EE7B7", fontWeight: 600, border: "1px solid rgba(16,185,129,0.2)" }}>
+                        <CheckCircle2 size={13} /> Débloquer
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setBlockConfirm({ id: company.id, name: company.name, action: "block" })}
+                        disabled={actionLoading === company.id}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs transition-all hover:opacity-80"
+                        style={{ background: "rgba(239,68,68,0.15)", color: "#FCA5A5", fontWeight: 600, border: "1px solid rgba(239,68,68,0.2)" }}>
+                        <Ban size={13} /> Bloquer
+                      </button>
+                    )}
                     <button onClick={() => setDeleteConfirm(company.id)}
                       className="w-9 h-9 rounded-xl flex items-center justify-center"
                       style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.2)" }}>
@@ -664,7 +788,10 @@ function SuperAdminDashboard({ onLogout }: { onLogout: () => void }) {
 
 // ─── Export principal ─────────────────────────────────────────
 export function SuperAdminPage() {
-  const [authenticated, setAuthenticated] = useState(() => sessionStorage.getItem(SESSION_KEY) === "1");
+  const [authenticated, setAuthenticated] = useState(() => {
+    const s = sessionStorage.getItem(SESSION_KEY);
+    return !!s && s.length > 0;
+  });
 
   const handleLogout = () => {
     sessionStorage.removeItem(SESSION_KEY);

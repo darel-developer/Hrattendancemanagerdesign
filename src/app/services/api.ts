@@ -217,8 +217,21 @@ export const superAdminApi = {
     }),
   createCompany: (company: { id: string; name: string; sector?: string; address?: string; hrEmail?: string; workStart?: string; lateTolerance?: number }) =>
     request<Company>("/companies", { method: "POST", body: JSON.stringify(company) }),
-  deleteCompany: (id: string) =>
-    request<{ success: boolean }>(`/companies/${id}`, { method: "DELETE" }),
+  deleteCompany: (id: string, superAdminPassword: string) =>
+    request<{ success: boolean; deletedEmployees: number }>(`/superadmin/companies/${id}`, {
+      method: "DELETE",
+      headers: { "x-superadmin-password": superAdminPassword },
+    }),
+  blockCompany: (id: string, superAdminPassword: string) =>
+    request<{ success: boolean; emailsSent: number }>(`/superadmin/companies/${id}/block`, {
+      method: "PATCH",
+      headers: { "x-superadmin-password": superAdminPassword },
+    }),
+  unblockCompany: (id: string, superAdminPassword: string) =>
+    request<{ success: boolean }>(`/superadmin/companies/${id}/unblock`, {
+      method: "PATCH",
+      headers: { "x-superadmin-password": superAdminPassword },
+    }),
   getAdmins: (companyId: string) =>
     request<Employee[]>(`/employees?companyId=${companyId}&role=Admin`),
 };

@@ -39,6 +39,7 @@ export interface Company {
   latitude?: number | null;
   longitude?: number | null;
   geoRadius?: number;
+  isBlocked?: boolean;
 }
 
 // ─── Attendance ───────────────────────────────────────────────────────────────

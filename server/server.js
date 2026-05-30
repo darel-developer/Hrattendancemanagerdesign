@@ -343,6 +343,19 @@ app.listen(PORT, async () => {
   } catch (err) {
     console.error('[DB] Erreur table kiosk_tokens :', err.message);
   }
+  // ── Colonne is_blocked sur companies ───────────────────────────────────────
+  try {
+    const [bCols] = await db.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'companies' AND column_name = 'is_blocked' AND table_schema = current_schema()`
+    );
+    if (bCols.length === 0) {
+      await db.query('ALTER TABLE companies ADD COLUMN is_blocked BOOLEAN DEFAULT FALSE');
+      console.log('[DB] Colonne is_blocked ajoutée à companies');
+    }
+  } catch (err) {
+    console.error('[DB] Erreur migration is_blocked :', err.message);
+  }
   // ── Tokens FCM push web ─────────────────────────────────────────────────────
   try {
     await db.query(`
