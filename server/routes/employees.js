@@ -106,8 +106,8 @@ router.post('/', requireAuth, requireRole('Admin'), async (req, res) => {
 
     const passwordHash = e.password ? await hashPassword(e.password) : null;
     const pin = e.pin ? String(e.pin) : null;
-    // Forcer le companyId depuis le token pour éviter les injections cross-tenant
-    const companyId = req.user.companyId;
+    // Superadmin (companyId null dans le token) utilise le companyId du body
+    const companyId = req.user.isSuperAdmin ? e.companyId : req.user.companyId;
 
     const workDaysStr = Array.isArray(e.workDays) && e.workDays.length ? e.workDays.join(',') : null;
     await db.query(
@@ -188,7 +188,11 @@ router.delete('/:id', requireAuth, requireRole('Admin'), async (req, res) => {
     if (req.params.id === req.user.id) {
       return res.status(400).json({ error: 'Impossible de supprimer votre propre compte' });
     }
-    await db.query('DELETE FROM employees WHERE id = ? AND company_id = ?', [req.params.id, req.user.companyId]);
+    if (req.user.isSuperAdmin) {
+      await db.query('DELETE FROM employees WHERE id = ?', [req.params.id]);
+    } else {
+      await db.query('DELETE FROM employees WHERE id = ? AND company_id = ?', [req.params.id, req.user.companyId]);
+    }
     res.json({ success: true });
   } catch (err) {
     console.error('[Employees] DELETE /:id', err.message);
