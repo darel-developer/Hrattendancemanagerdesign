@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { sendPush } = require('../services/fcm');
+const { requireAuth, checkCompany } = require('../middleware/auth');
 
 function mapNotif(row) {
   const dateStr = row.date ? String(row.date).replace(' ', 'T') : null;
@@ -18,7 +19,7 @@ function mapNotif(row) {
 
 const VALID_TYPES = ['absence', 'conge', 'document', 'retard', 'system'];
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const n = req.body;
     if (!n.title || !n.message) return res.status(400).json({ error: 'title et message requis' });
@@ -38,7 +39,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, checkCompany, async (req, res) => {
   try {
     const { companyId } = req.query;
     let query, params = [];
@@ -59,7 +60,7 @@ router.get('/', async (req, res) => {
 });
 
 // Marquer tout comme lu — scopé par companyId si fourni
-router.put('/read-all', async (req, res) => {
+router.put('/read-all', requireAuth, checkCompany, async (req, res) => {
   try {
     const { companyId } = req.query;
     if (companyId) {
@@ -78,7 +79,7 @@ router.put('/read-all', async (req, res) => {
   }
 });
 
-router.put('/:id/read', async (req, res) => {
+router.put('/:id/read', requireAuth, async (req, res) => {
   try {
     await db.query('UPDATE notifications SET is_read = TRUE WHERE id = ?', [req.params.id]);
     res.json({ success: true });
@@ -88,7 +89,7 @@ router.put('/:id/read', async (req, res) => {
 });
 
 // Supprimer toutes les notifications — companyId requis pour éviter la suppression globale accidentelle
-router.delete('/', async (req, res) => {
+router.delete('/', requireAuth, checkCompany, async (req, res) => {
   try {
     const { companyId } = req.query;
     if (!companyId) return res.status(400).json({ error: 'companyId requis' });
@@ -104,7 +105,7 @@ router.delete('/', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     await db.query('DELETE FROM notifications WHERE id = ?', [req.params.id]);
     res.json({ success: true });

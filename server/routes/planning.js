@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, checkCompany } = require('../middleware/auth');
 
 function mapShift(row) {
   return {
@@ -15,7 +16,7 @@ function mapShift(row) {
   };
 }
 
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, checkCompany, async (req, res) => {
   try {
     const { employeeId, companyId, startDate, endDate } = req.query;
     let query = companyId
@@ -42,7 +43,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const s = req.body;
     const id = s.id || `SHF${Date.now().toString(36).slice(-7).toUpperCase()}`;
@@ -65,7 +66,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const s = req.body;
     await db.query(
@@ -86,7 +87,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     await db.query('DELETE FROM team_shifts WHERE id = ?', [req.params.id]);
     res.json({ success: true });

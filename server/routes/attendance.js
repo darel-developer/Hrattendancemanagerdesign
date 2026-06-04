@@ -27,13 +27,29 @@ function mapRecord(row) {
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { date, employeeId, startDate, endDate } = req.query;
-    let query = 'SELECT * FROM attendance_records WHERE 1=1';
+
+    // Scoper systématiquement par entreprise pour éviter la fuite inter-tenant
+    let query = `SELECT ar.* FROM attendance_records ar
+                 JOIN employees e ON ar.employee_id = e.id WHERE 1=1`;
     const params = [];
-    if (date)       { query += ' AND date = ?';        params.push(date); }
-    if (startDate)  { query += ' AND date >= ?';       params.push(startDate); }
-    if (endDate)    { query += ' AND date <= ?';       params.push(endDate); }
-    if (employeeId) { query += ' AND employee_id = ?'; params.push(employeeId); }
-    query += ' ORDER BY date DESC, id';
+
+    if (!req.user.isSuperAdmin) {
+      query += ' AND e.company_id = ?';
+      params.push(req.user.companyId);
+    }
+    // Un employé ne voit que ses propres pointages
+    if (req.user.role === 'Employee') {
+      query += ' AND ar.employee_id = ?';
+      params.push(req.user.id);
+    } else if (employeeId) {
+      query += ' AND ar.employee_id = ?';
+      params.push(employeeId);
+    }
+
+    if (date)      { query += ' AND ar.date = ?';   params.push(date); }
+    if (startDate) { query += ' AND ar.date >= ?';  params.push(startDate); }
+    if (endDate)   { query += ' AND ar.date <= ?';  params.push(endDate); }
+    query += ' ORDER BY ar.date DESC, ar.id';
     const [rows] = await db.query(query, params);
     res.json(rows.map(mapRecord));
   } catch (err) {
@@ -139,6 +155,15 @@ router.post('/', requireAuth, async (req, res) => {
 
 router.put('/:id', requireAuth, async (req, res) => {
   try {
+    // Vérifier que l'enregistrement appartient à l'entreprise du requêtant
+    const [ownerRows] = await db.query(
+      `SELECT ar.id FROM attendance_records ar
+       JOIN employees e ON ar.employee_id = e.id
+       WHERE ar.id = ? AND (? OR e.company_id = ?)`,
+      [req.params.id, !!req.user.isSuperAdmin, req.user.companyId]
+    );
+    if (ownerRows.length === 0) return res.status(403).json({ error: 'Accès refusé à cet enregistrement' });
+
     const r = req.body;
     const sets = [];
     const params = [];

@@ -140,11 +140,17 @@ router.put('/:id', requireAuth, async (req, res) => {
   try {
     // Seuls les Admins peuvent modifier n'importe quel employé
     // Un employé peut modifier uniquement son propre profil (sans changer son rôle)
-    if (req.user.role !== 'Admin' && req.params.id !== req.user.id) {
+    if (req.user.role !== 'Admin' && !req.user.isSuperAdmin && req.params.id !== req.user.id) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
     const e = req.body;
+
+    // Empêche l'auto-promotion de rôle : seul un Admin peut changer le rôle d'un employé
+    if (req.user.role !== 'Admin' && !req.user.isSuperAdmin) {
+      const [existing] = await db.query('SELECT role FROM employees WHERE id = ?', [req.params.id]);
+      if (existing.length > 0) e.role = existing[0].role; // forcer le rôle existant
+    }
     const valErr = validateEmployee(e);
     if (valErr) return res.status(400).json({ error: valErr });
 

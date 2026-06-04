@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth } = require('../middleware/auth');
 
 function mapCompany(row) {
   return {
@@ -26,25 +27,34 @@ async function ensureGeoColumns() {
   await db.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS geo_radius INTEGER NOT NULL DEFAULT 100`);
 }
 
-router.get('/', async (_req, res) => {
+// Superadmin voit toutes les entreprises ; un admin ne voit que la sienne
+router.get('/', requireAuth, async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    let query = `
       SELECT c.*,
         COUNT(e.id) AS employee_count,
         COUNT(CASE WHEN e.role = 'Admin' THEN 1 END) AS admin_count
       FROM companies c
-      LEFT JOIN employees e ON e.company_id = c.id
-      GROUP BY c.id
-      ORDER BY c.name
-    `);
+      LEFT JOIN employees e ON e.company_id = c.id`;
+    const params = [];
+    if (!req.user.isSuperAdmin) {
+      query += ' WHERE c.id = ?';
+      params.push(req.user.companyId);
+    }
+    query += ' GROUP BY c.id ORDER BY c.name';
+    const [rows] = await db.query(query, params);
     res.json(rows.map(mapCompany));
   } catch {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
+    // Un utilisateur normal ne peut lire que sa propre entreprise
+    if (!req.user.isSuperAdmin && req.params.id !== req.user.companyId) {
+      return res.status(403).json({ error: 'Accès refusé à cette entreprise' });
+    }
     const [rows] = await db.query('SELECT * FROM companies WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Entreprise non trouvée' });
     res.json(mapCompany(rows[0]));
@@ -53,7 +63,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+// Création réservée au superadmin
+router.post('/', requireAuth, async (req, res) => {
+  if (!req.user.isSuperAdmin) return res.status(403).json({ error: 'Réservé au superadmin' });
   try {
     const c = req.body;
     if (!c.id || !c.name) return res.status(400).json({ error: 'ID et nom requis' });
@@ -73,7 +85,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+// Modification : admin de l'entreprise ou superadmin
+router.put('/:id', requireAuth, async (req, res) => {
+  if (!req.user.isSuperAdmin && req.params.id !== req.user.companyId) {
+    return res.status(403).json({ error: 'Accès refusé à cette entreprise' });
+  }
   try {
     const c = req.body;
     await db.query(
@@ -93,7 +109,9 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+// Suppression réservée au superadmin (le superadmin.js gère la cascade)
+router.delete('/:id', requireAuth, async (req, res) => {
+  if (!req.user.isSuperAdmin) return res.status(403).json({ error: 'Réservé au superadmin' });
   try {
     await db.query('DELETE FROM companies WHERE id = ?', [req.params.id]);
     res.json({ success: true });

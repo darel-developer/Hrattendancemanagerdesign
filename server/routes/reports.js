@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, checkCompany } = require('../middleware/auth');
 
 async function ensureTable() {
   await db.query(`
@@ -39,7 +40,7 @@ function mapReport(row) {
   };
 }
 
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, checkCompany, async (req, res) => {
   try {
     const { recipientId, senderId } = req.query;
     let query = 'SELECT * FROM reports WHERE 1=1';
@@ -54,7 +55,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const r = req.body;
     const id = `RPT${Date.now().toString(36).slice(-7).toUpperCase()}`;
@@ -71,7 +72,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id/read', async (req, res) => {
+router.put('/:id/read', requireAuth, async (req, res) => {
   try {
     await db.query('UPDATE reports SET is_read = TRUE WHERE id = ?', [req.params.id]);
     res.json({ success: true });
@@ -80,7 +81,7 @@ router.put('/:id/read', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     await db.query('DELETE FROM reports WHERE id = ?', [req.params.id]);
     res.json({ success: true });

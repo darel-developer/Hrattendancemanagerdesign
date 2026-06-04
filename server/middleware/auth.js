@@ -2,7 +2,16 @@
 
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = () => process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION';
+const KNOWN_WEAK = ['CHANGE_ME_IN_PRODUCTION', 'secret', 'jwt_secret', 'changeme'];
+const JWT_SECRET = () => {
+  const s = process.env.JWT_SECRET;
+  if (!s || KNOWN_WEAK.some(w => s.toLowerCase().includes(w)) || s.length < 32) {
+    console.error('[FATAL] JWT_SECRET absent ou trop faible — démarrage bloqué en production');
+    if (process.env.NODE_ENV === 'production') process.exit(1);
+    return s || 'CHANGE_ME_IN_PRODUCTION'; // dev seulement
+  }
+  return s;
+};
 
 /**
  * Vérifie le Bearer token JWT et injecte req.user.

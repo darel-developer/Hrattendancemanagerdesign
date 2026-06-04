@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { requireAuth, checkCompany } = require('../middleware/auth');
 
 function mapDocument(row) {
   return {
@@ -14,7 +15,7 @@ function mapDocument(row) {
   };
 }
 
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, checkCompany, async (req, res) => {
   try {
     const { employeeId, companyId } = req.query;
     let query = companyId
@@ -31,7 +32,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const d = req.body;
     const id = d.id || `DOC${Date.now().toString(36).slice(-7).toUpperCase()}`;
@@ -51,7 +52,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const d = req.body;
     await db.query(
@@ -72,7 +73,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     await db.query('DELETE FROM employee_documents WHERE id = ?', [req.params.id]);
     res.json({ success: true });

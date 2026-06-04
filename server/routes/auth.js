@@ -2,21 +2,13 @@
 
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
+const bcrypt = require('bcrypt'); // dépendance obligatoire — pas de fallback SHA-256
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { mapEmployee } = require('./employees');
 const { requireAuth } = require('../middleware/auth');
 
-// Chargement optionnel de bcrypt (dégradé vers SHA-256 si absent)
-let bcrypt = null;
-try { bcrypt = require('bcrypt'); } catch { /* bcrypt non disponible */ }
-
 const BCRYPT_ROUNDS = 12;
-
-function sha256(str) {
-  return crypto.createHash('sha256').update(str).digest('hex');
-}
 
 function isBcryptHash(hash) {
   return typeof hash === 'string' && (hash.startsWith('$2b$') || hash.startsWith('$2a$'));
@@ -24,16 +16,13 @@ function isBcryptHash(hash) {
 
 async function verifyPassword(plain, stored) {
   if (!stored) return false;
-  if (isBcryptHash(stored)) {
-    return bcrypt ? bcrypt.compare(plain, stored) : false;
-  }
-  // Héritage SHA-256
-  return sha256(plain) === stored;
+  if (isBcryptHash(stored)) return bcrypt.compare(plain, stored);
+  // Comptes migrés depuis l'ancien SHA-256 : bloquer et demander un reset
+  return false;
 }
 
 async function hashPassword(plain) {
-  if (bcrypt) return bcrypt.hash(plain, BCRYPT_ROUNDS);
-  return sha256(plain); // fallback si bcrypt non installé
+  return bcrypt.hash(plain, BCRYPT_ROUNDS);
 }
 
 function signToken(emp) {

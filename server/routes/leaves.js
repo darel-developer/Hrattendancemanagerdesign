@@ -58,6 +58,9 @@ router.post('/', requireAuth, async (req, res) => {
     if (req.user.role === 'Employee' && l.employeeId !== req.user.id) {
       return res.status(403).json({ error: 'Vous ne pouvez soumettre une demande que pour vous-même' });
     }
+    // Un employé ne peut pas s'auto-approuver — statut forcé à "En attente"
+    const status = (req.user.role === 'Employee') ? 'En attente' : (l.status || 'En attente');
+
     const id = l.id || `LVE${Date.now()}`;
     await db.query(
       `INSERT INTO leave_requests
@@ -66,7 +69,7 @@ router.post('/', requireAuth, async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, l.employeeId, l.type, l.startDate, l.endDate, l.days,
-        l.reason || '', l.status || 'En attente',
+        l.reason || '', status,
         l.requestDate || new Date().toISOString().split('T')[0],
         l.reviewedBy || null, l.reviewDate || null, l.comment || '',
       ]
@@ -88,6 +91,17 @@ router.put('/:id', requireAuth, async (req, res) => {
     }
 
     const l = req.body;
+
+    // Vérifier que la demande appartient à l'entreprise du requêtant
+    const [checkRows] = await db.query(
+      `SELECT lr.*, e.company_id FROM leave_requests lr
+       JOIN employees e ON lr.employee_id = e.id WHERE lr.id = ?`,
+      [req.params.id]
+    );
+    if (checkRows.length === 0) return res.status(404).json({ error: 'Congé non trouvé' });
+    if (!req.user.isSuperAdmin && checkRows[0].company_id !== req.user.companyId) {
+      return res.status(403).json({ error: 'Accès refusé à cette demande de congé' });
+    }
 
     // Validation du solde avant approbation
     if (l.status === 'Approuvé') {
