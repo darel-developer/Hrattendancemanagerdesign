@@ -17,6 +17,7 @@ const companiesRouter = require('./routes/companies');
 const kioskRouter = require('./routes/kiosk');
 const superadminRouter = require('./routes/superadmin');
 const { router: reportsRouter, ensureTable: ensureReportsTable } = require('./routes/reports');
+const { router: analyticsRouter, ensureTable: ensureAnalyticsTable } = require('./routes/analytics');
 const { router: departmentsRouter, ensureTable: ensureDepartmentsTable } = require('./routes/departments');
 const performanceRouter = require('./routes/performance');
 const documentsRouter = require('./routes/documents');
@@ -93,6 +94,7 @@ app.use('/api/leaves', leavesRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/companies', companiesRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/analytics', analyticsRouter);
 app.use('/api/departments', departmentsRouter);
 app.use('/api/performance', performanceRouter);
 app.use('/api/documents', documentsRouter);
@@ -291,6 +293,12 @@ app.listen(PORT, async () => {
     console.log('[DB] Table reports prête');
   } catch (err) {
     console.error('[DB] Erreur création table reports :', err.message);
+  }
+  try {
+    await ensureAnalyticsTable();
+    console.log('[DB] Table analytics_reports prête');
+  } catch (err) {
+    console.error('[DB] Erreur table analytics_reports :', err.message);
   }
   try {
     await ensureDepartmentsTable();

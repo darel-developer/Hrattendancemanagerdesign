@@ -135,6 +135,25 @@ export const reportsApi = {
     request<{ success: boolean }>(`/reports/${id}`, { method: "DELETE" }),
 };
 
+export interface AnalyticsReport {
+  id: string; companyId: string; type: string; title: string;
+  periodStart: string; periodEnd: string; department?: string;
+  generatedBy: string; status: string; data?: any; createdAt: string;
+}
+
+export const analyticsApi = {
+  list: (params: { companyId?: string; type?: string }) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) as Record<string, string>
+    ).toString();
+    return request<AnalyticsReport[]>(`/analytics${qs ? '?' + qs : ''}`);
+  },
+  get: (id: string) => request<AnalyticsReport>(`/analytics/${id}`),
+  generate: (body: { type: string; periodStart: string; periodEnd: string; department?: string; employeeId?: string; title?: string; companyId?: string }) =>
+    request<AnalyticsReport>('/analytics/generate', { method: 'POST', body: JSON.stringify(body) }),
+  delete: (id: string) => request<{ success: boolean }>(`/analytics/${id}`, { method: 'DELETE' }),
+};
+
 // ─── Performance ──────────────────────────────────────────────
 export const performanceApi = {
   getAll: (params?: { employeeId?: string; reviewerId?: string; companyId?: string }) => {
