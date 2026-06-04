@@ -5,11 +5,33 @@ import { authApi } from '../services/api';
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
 async function registerToken() {
-  await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-  const token = await getToken(messaging, { vapidKey: VAPID_KEY });
-  if (token) {
+  try {
+    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('[FCM] Service worker prêt :', reg.scope);
+  } catch (e) {
+    console.error('[FCM] ❌ Service worker échec :', e);
+    throw e;
+  }
+
+  let token: string | null = null;
+  try {
+    token = await getToken(messaging, { vapidKey: VAPID_KEY });
+    console.log('[FCM] Token obtenu :', token ? `...${token.slice(-10)}` : 'VIDE');
+  } catch (e) {
+    console.error('[FCM] ❌ getToken() échec :', e);
+    throw e;
+  }
+
+  if (!token) {
+    console.warn('[FCM] ⚠ Token vide — VAPID key incorrecte ou SW non prêt');
+    return;
+  }
+
+  try {
     await authApi.registerFcmToken(token);
     console.log('[FCM] ✓ Token enregistré sur le serveur');
+  } catch (e) {
+    console.error('[FCM] ❌ Enregistrement serveur échoué :', e);
   }
 }
 
