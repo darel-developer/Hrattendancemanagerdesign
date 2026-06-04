@@ -43,11 +43,12 @@ async function sendPush(employeeId, title, body, link = '/notifications') {
       [employeeId]
     );
     if (!rows.length) {
-      console.log(`[FCM] sendPush → aucun token enregistré pour employé ${employeeId}`);
+      console.log(`[FCM] ⚠ Pas de token — destinataire: ${employeeId}`);
       return;
     }
 
-    console.log(`[FCM] sendPush → ${rows.length} appareil(s) pour ${employeeId} | "${title}"`);
+    const tokenSummary = rows.map(r => `${r.platform}:...${r.token.slice(-8)}`).join(', ');
+    console.log(`[FCM] ▶ Envoi — destinataire: ${employeeId} | appareils: [${tokenSummary}] | titre: "${title}"`);
 
     const sends = rows.map(({ token, platform }) => {
       const msg = {
@@ -68,13 +69,13 @@ async function sendPush(employeeId, title, body, link = '/notifications') {
       };
       return messaging.send(msg)
         .then((msgId) => {
-          console.log(`[FCM] ✓ Push envoyé (${platform}) → messageId: ${msgId}`);
+          console.log(`[FCM] ✓ Livré — destinataire: ${employeeId} | platform: ${platform} | token: ...${token.slice(-8)} | msgId: ${msgId.split('/').pop()}`);
         })
         .catch(async (err) => {
-          console.error(`[FCM] ✗ Échec push (${platform}) pour ${employeeId} :`, err.code || err.message);
+          console.error(`[FCM] ✗ Échec — destinataire: ${employeeId} | platform: ${platform} | token: ...${token.slice(-8)} | erreur: ${err.code || err.message}`);
           if (err.code === 'messaging/registration-token-not-registered' ||
               err.code === 'messaging/invalid-registration-token') {
-            console.log(`[FCM] Token invalide supprimé pour ${employeeId} (${platform})`);
+            console.log(`[FCM] 🗑 Token expiré supprimé — ${employeeId} (${platform}) ...${token.slice(-8)}`);
             await db.query('DELETE FROM push_tokens WHERE token = ?', [token]).catch(() => {});
           }
         });

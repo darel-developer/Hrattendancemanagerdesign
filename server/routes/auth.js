@@ -131,7 +131,7 @@ router.put('/fcm-token', requireAuth, async (req, res) => {
        ON CONFLICT (employee_id, platform) DO UPDATE SET token = EXCLUDED.token, updated_at = NOW()`,
       [req.user.id, token, p]
     );
-    console.log(`[FCM] Token enregistré — employé: ${req.user.id} | platform: ${p} | token: ...${token.slice(-12)}`);
+    console.log(`[FCM] 📱 Token enregistré — émetteur/destinataire: ${req.user.id} | platform: ${p} | token: ...${token.slice(-12)}`);
     res.json({ success: true });
   } catch (err) {
     console.error('[FCM] Enregistrement token :', err.message);
