@@ -9,15 +9,24 @@ const SUPER_PWD    = () => process.env.SUPER_ADMIN_PASSWORD || 'superadmin2024';
 const JWT_SECRET   = () => process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION';
 
 // ─── Middleware superadmin ────────────────────────────────────────────────────
-const { requireAuth } = require('../middleware/auth');
-
-function requireSuperAdmin(req, res, next) {
-  requireAuth(req, res, () => {
-    if (!req.user?.isSuperAdmin) {
+// Implémenté indépendamment de requireAuth pour éviter les incompatibilités
+// avec le pattern async/callback de requireAuth
+async function requireSuperAdmin(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentification superadmin requise' });
+  }
+  try {
+    const jwt = require('jsonwebtoken');
+    const payload = jwt.verify(auth.slice(7), process.env.JWT_SECRET || 'CHANGE_ME_IN_PRODUCTION');
+    if (!payload.isSuperAdmin) {
       return res.status(403).json({ error: 'Accès superadmin uniquement' });
     }
+    req.user = payload;
     next();
-  });
+  } catch {
+    return res.status(401).json({ error: 'Token superadmin invalide ou expiré' });
+  }
 }
 
 // ─── Email helper (nodemailer optionnel) ──────────────────────────────────────

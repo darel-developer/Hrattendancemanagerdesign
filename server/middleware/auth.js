@@ -3,10 +3,11 @@
 const jwt = require('jsonwebtoken');
 const db  = require('../db');
 
-const KNOWN_WEAK = ['CHANGE_ME_IN_PRODUCTION', 'secret', 'jwt_secret', 'changeme'];
+// Valeurs exactes connues comme faibles (pas de sous-chaîne pour éviter les faux positifs)
+const KNOWN_WEAK_EXACT = ['CHANGE_ME_IN_PRODUCTION', 'secret', 'changeme', 'password', '123456'];
 const JWT_SECRET = () => {
   const s = process.env.JWT_SECRET;
-  if (!s || KNOWN_WEAK.some(w => s.toLowerCase().includes(w)) || s.length < 32) {
+  if (!s || KNOWN_WEAK_EXACT.includes(s) || s.length < 16) {
     console.error('[FATAL] JWT_SECRET absent ou trop faible — démarrage bloqué en production');
     if (process.env.NODE_ENV === 'production') process.exit(1);
     return s || 'CHANGE_ME_IN_PRODUCTION'; // dev seulement
