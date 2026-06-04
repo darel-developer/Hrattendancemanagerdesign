@@ -20,6 +20,26 @@ export function setAuthToken(token: string | null): void {
   _authToken = token;
 }
 
+// Superadmin lit toujours son JWT depuis sessionStorage (évite l'écrasement par AuthContext)
+function getSuperAdminToken(): string | null {
+  try { return sessionStorage.getItem("hr_superadmin"); } catch { return null; }
+}
+
+async function requestSA<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getSuperAdminToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: { ...headers, ...(options?.headers as Record<string, string> | undefined) },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (_authToken) headers["Authorization"] = `Bearer ${_authToken}`;
@@ -260,21 +280,28 @@ export const authApi = {
 
 // ─── Super Admin ──────────────────────────────────────────────
 export const superAdminApi = {
+  // verify utilise request() normal — pas encore de token superadmin au login
   verify: (password: string) =>
     request<{ valid: boolean; token: string }>("/superadmin/verify", {
       method: "POST",
       body: JSON.stringify({ password }),
     }),
+  // Les autres opérations utilisent requestSA() qui lit le JWT depuis sessionStorage
+  // directement, évitant l'écrasement par AuthContext (restauration session employé)
   createCompany: (company: { id: string; name: string; sector?: string; address?: string; hrEmail?: string; workStart?: string; lateTolerance?: number }) =>
-    request<Company>("/companies", { method: "POST", body: JSON.stringify(company) }),
+    requestSA<Company>("/companies", { method: "POST", body: JSON.stringify(company) }),
   deleteCompany: (id: string) =>
-    request<{ success: boolean; deletedEmployees: number }>(`/superadmin/companies/${id}`, { method: "DELETE" }),
+    requestSA<{ success: boolean; deletedEmployees: number }>(`/superadmin/companies/${id}`, { method: "DELETE" }),
   blockCompany: (id: string) =>
-    request<{ success: boolean; emailsSent: number }>(`/superadmin/companies/${id}/block`, { method: "PATCH" }),
+    requestSA<{ success: boolean; emailsSent: number }>(`/superadmin/companies/${id}/block`, { method: "PATCH" }),
   unblockCompany: (id: string) =>
-    request<{ success: boolean }>(`/superadmin/companies/${id}/unblock`, { method: "PATCH" }),
+    requestSA<{ success: boolean }>(`/superadmin/companies/${id}/unblock`, { method: "PATCH" }),
   getAdmins: (companyId: string) =>
-    request<Employee[]>(`/employees?companyId=${companyId}&role=Admin`),
+    requestSA<Employee[]>(`/employees?companyId=${companyId}&role=Admin`),
+  saCreateEmployee: (emp: Employee & { password?: string; pin?: string }) =>
+    requestSA<Employee>("/employees", { method: "POST", body: JSON.stringify(emp) }),
+  saDeleteEmployee: (id: string) =>
+    requestSA<{ success: boolean }>(`/employees/${id}`, { method: "DELETE" }),
 };
 
 // ─── Kiosk ────────────────────────────────────────────────────

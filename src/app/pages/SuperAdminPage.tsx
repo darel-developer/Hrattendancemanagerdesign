@@ -261,7 +261,7 @@ function AdminModal({ company, onClose }: { company: CompanyWithCounts; onClose:
     setError("");
     try {
       const newId = `EMP${Date.now().toString().slice(-6)}`;
-      await employeesApi.create({
+      await superAdminApi.saCreateEmployee({
         id: newId,
         companyId: company.id,
         firstName: form.firstName,
@@ -296,7 +296,7 @@ function AdminModal({ company, onClose }: { company: CompanyWithCounts; onClose:
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Supprimer cet administrateur ?")) return;
-    await employeesApi.delete(id);
+    await superAdminApi.saDeleteEmployee(id);
     setAdmins((p) => p.filter((a) => a.id !== id));
   };
 
