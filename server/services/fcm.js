@@ -23,7 +23,19 @@ function initFCM() {
   }
 }
 
-async function sendPush(employeeId, title, body) {
+const TYPE_LINKS = {
+  absence:  '/attendance',
+  retard:   '/attendance',
+  conge:    '/leaves',
+  document: '/documents',
+  system:   '/notifications',
+};
+
+function typeToLink(type) {
+  return TYPE_LINKS[type] || '/notifications';
+}
+
+async function sendPush(employeeId, title, body, link = '/notifications') {
   if (!messaging || !employeeId) return;
   try {
     const [rows] = await db.query(
@@ -44,10 +56,14 @@ async function sendPush(employeeId, title, body) {
         ...(platform === 'web' ? {
           webpush: {
             notification: { icon: '/icon-192.png', badge: '/icon-192.png', requireInteraction: false },
-            fcmOptions: { link: '/' },
+            data: { url: link },
+            fcmOptions: { link },
           },
         } : {
-          android: { notification: { icon: 'ic_notification', color: '#6366F1' } },
+          android: {
+            notification: { icon: 'ic_notification', color: '#6366F1', clickAction: 'FLUTTER_NOTIFICATION_CLICK' },
+            data: { url: link },
+          },
         }),
       };
       return messaging.send(msg)
@@ -70,4 +86,4 @@ async function sendPush(employeeId, title, body) {
   }
 }
 
-module.exports = { initFCM, sendPush };
+module.exports = { initFCM, sendPush, typeToLink };

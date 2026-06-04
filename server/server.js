@@ -150,7 +150,7 @@ async function generateDailyAbsenceNotifications() {
            VALUES (?, 'absence', ?, ?, NOW(), FALSE, ?)`,
           [notifId(), absTitle, absMsg, emp.id]
         );
-        sendPush(emp.id, absTitle, absMsg);
+        sendPush(emp.id, absTitle, absMsg, '/attendance');
         absenceCount++;
       }
     }
@@ -203,7 +203,7 @@ async function generateMonthlyReport() {
            VALUES (?, 'system', ?, ?, NOW(), FALSE, ?)`,
           [notifId(), repTitle, repMsg, admin.id]
         );
-        sendPush(admin.id, repTitle, repMsg);
+        sendPush(admin.id, repTitle, repMsg, '/notifications');
       }
     }
     console.log(`[Auto] Rapport mensuel ${monthLabel} envoyé`);

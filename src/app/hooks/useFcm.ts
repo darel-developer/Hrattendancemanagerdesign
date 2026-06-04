@@ -56,7 +56,9 @@ export function useFcm(isAuthenticated: boolean) {
     unsubscribe = onMessage(messaging, (payload) => {
       const title = payload.notification?.title ?? 'HR Manager';
       const body = payload.notification?.body ?? '';
-      new Notification(title, { body, icon: '/icon-192.png' });
+      const url = (payload.data as Record<string, string> | undefined)?.url || '/notifications';
+      const notif = new Notification(title, { body, icon: '/icon-192.png' });
+      notif.onclick = () => { window.focus(); window.location.href = url; };
     });
 
     return () => { unsubscribe?.(); };

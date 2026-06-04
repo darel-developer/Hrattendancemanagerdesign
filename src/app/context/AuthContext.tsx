@@ -76,6 +76,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("auth:expired", handleExpired);
   }, []);
 
+  // Listen for company blocked event dispatched by api.ts on 403 blocked
+  useEffect(() => {
+    const handleBlocked = (e: Event) => {
+      const msg = (e as CustomEvent).detail?.error || "Accès suspendu.";
+      alert(`🔒 ${msg}`);
+      logout();
+    };
+    window.addEventListener("company:blocked", handleBlocked);
+    return () => window.removeEventListener("company:blocked", handleBlocked);
+  }, []);
+
   const login = async (email: string, password: string): Promise<LoginResult> => {
     try {
       const { token, user } = await authApi.login(email, password);

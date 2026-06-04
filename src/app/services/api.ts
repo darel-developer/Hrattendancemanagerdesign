@@ -35,6 +35,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(body.error || "Session expirée");
   }
 
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    if (body.blocked) {
+      window.dispatchEvent(new CustomEvent("company:blocked", { detail: body }));
+      throw new Error(body.error);
+    }
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || res.statusText);

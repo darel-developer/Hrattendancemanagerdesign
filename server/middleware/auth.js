@@ -1,6 +1,7 @@
 'use strict';
 
 const jwt = require('jsonwebtoken');
+const db  = require('../db');
 
 const KNOWN_WEAK = ['CHANGE_ME_IN_PRODUCTION', 'secret', 'jwt_secret', 'changeme'];
 const JWT_SECRET = () => {
@@ -18,7 +19,7 @@ const JWT_SECRET = () => {
  * Le superadmin utilise un JWT dédié (role: Admin, isSuperAdmin: true)
  * émis par POST /api/superadmin/verify.
  */
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authentification requise' });
@@ -26,13 +27,32 @@ function requireAuth(req, res, next) {
   const token = auth.slice(7);
   try {
     req.user = jwt.verify(token, JWT_SECRET());
-    next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Session expirée', expired: true });
     }
     return res.status(401).json({ error: 'Token invalide' });
   }
+
+  // Vérifier en temps réel si l'entreprise est bloquée (sauf superadmin)
+  if (req.user.companyId && !req.user.isSuperAdmin) {
+    try {
+      const [rows] = await db.query(
+        'SELECT is_blocked FROM companies WHERE id = ?',
+        [req.user.companyId]
+      );
+      if (rows[0]?.is_blocked) {
+        return res.status(403).json({
+          error: 'Accès suspendu. Votre abonnement a expiré — contactez votre administrateur.',
+          blocked: true,
+        });
+      }
+    } catch {
+      // Erreur DB non bloquante — on laisse passer
+    }
+  }
+
+  next();
 }
 
 /**
