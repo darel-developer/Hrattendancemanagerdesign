@@ -252,37 +252,32 @@ async function recalculateTodayAttendanceStatuses() {
 }
 
 function scheduleAutoNotifications() {
-  const now = new Date();
+  // Utilise setInterval d'1 minute pour éviter le dépassement int32 de setTimeout
+  // (les grands délais > 24.8 jours causent un TimeoutOverflowWarning et s'exécutent à 1ms)
+  let lastAbsenceDate = null;
+  let lastReportMonth = null;
 
-  // Daily absence check at 09:30
-  const nextCheck = new Date(now);
-  nextCheck.setHours(9, 30, 0, 0);
-  if (nextCheck <= now) nextCheck.setDate(nextCheck.getDate() + 1);
-  const msUntilCheck = nextCheck.getTime() - now.getTime();
+  setInterval(() => {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const monthKey = `${now.getFullYear()}-${now.getMonth()}`;
 
-  setTimeout(() => {
-    generateDailyAbsenceNotifications();
-    setInterval(generateDailyAbsenceNotifications, 24 * 60 * 60 * 1000);
-  }, msUntilCheck);
+    // Vérification absences tous les jours à 09h30
+    if (h === 9 && m >= 30 && m < 35 && lastAbsenceDate !== today) {
+      lastAbsenceDate = today;
+      generateDailyAbsenceNotifications();
+    }
 
-  // Monthly report on the 1st of each month at 08:00
-  const isFirstOfMonth = now.getDate() === 1 && now.getHours() < 8;
-  if (isFirstOfMonth) {
-    const sendTime = new Date(now);
-    sendTime.setHours(8, 0, 0, 0);
-    setTimeout(generateMonthlyReport, sendTime.getTime() - now.getTime());
-  } else {
-    const next1st = new Date(now.getFullYear(), now.getMonth() + 1, 1, 8, 0, 0, 0);
-    setTimeout(function scheduleMonthly() {
+    // Rapport mensuel le 1er du mois à 08h00
+    if (now.getDate() === 1 && h === 8 && m < 5 && lastReportMonth !== monthKey) {
+      lastReportMonth = monthKey;
       generateMonthlyReport();
-      // Re-schedule for next month
-      const n = new Date();
-      const next = new Date(n.getFullYear(), n.getMonth() + 1, 1, 8, 0, 0, 0);
-      setTimeout(scheduleMonthly, next.getTime() - Date.now());
-    }, next1st.getTime() - now.getTime());
-  }
+    }
+  }, 60 * 1000); // tick toutes les minutes — aucun risque de débordement
 
-  console.log(`[Auto] Prochaine vérification absences : ${nextCheck.toLocaleTimeString('fr-FR')}`);
+  console.log('[Auto] Scheduler démarré — vérification toutes les minutes (absences 09h30, rapport le 1er à 08h00)');
 }
 
 // ─── Startup ───────────────────────────────────────────────────────────────────
