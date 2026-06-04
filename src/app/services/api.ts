@@ -154,6 +154,29 @@ export const analyticsApi = {
   delete: (id: string) => request<{ success: boolean }>(`/analytics/${id}`, { method: 'DELETE' }),
 };
 
+export interface ManagerReport {
+  id: string; companyId: string; department?: string; managerId: string;
+  reportType: string; title: string; periodStart?: string; periodEnd?: string;
+  content: Record<string, any>; status: string; attachmentsCount: number;
+  submittedAt?: string; reviewedAt?: string; approvedAt?: string;
+  createdAt: string; updatedAt: string;
+}
+
+export const managerReportsApi = {
+  list: (params: { companyId?: string; managerId?: string; reportType?: string; status?: string; department?: string }) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) as Record<string, string>).toString();
+    return request<ManagerReport[]>(`/manager-reports${qs ? '?' + qs : ''}`);
+  },
+  get: (id: string) => request<ManagerReport>(`/manager-reports/${id}`),
+  create: (body: { reportType: string; title: string; periodStart?: string; periodEnd?: string; department?: string; content?: Record<string, any> }) =>
+    request<ManagerReport>('/manager-reports', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: Partial<{ title: string; periodStart: string; periodEnd: string; department: string; content: Record<string, any>; status: string }>) =>
+    request<ManagerReport>(`/manager-reports/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  submit: (id: string) =>
+    request<ManagerReport>(`/manager-reports/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'submitted' }) }),
+  delete: (id: string) => request<{ success: boolean }>(`/manager-reports/${id}`, { method: 'DELETE' }),
+};
+
 // ─── Performance ──────────────────────────────────────────────
 export const performanceApi = {
   getAll: (params?: { employeeId?: string; reviewerId?: string; companyId?: string }) => {

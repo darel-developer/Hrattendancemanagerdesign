@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { AnalyticsReportsSection } from "../components/AnalyticsReportsSection";
+import { ManagerReportsSection } from "../components/ManagerReportsSection";
 import {
   Download, FileText, TrendingUp, Users, Clock, CalendarDays,
   Send, X, CheckCircle2, Edit3, ChevronRight, Printer, Paperclip
@@ -733,7 +734,9 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
 export function ReportsPage() {
   const { currentUser, employees: allEmployees } = useAuth();
   const role = currentUser?.role;
-  const [activeTab, setActiveTab] = useState<"analytics" | "communication">(role === "Employee" ? "communication" : "analytics");
+  const [activeTab, setActiveTab] = useState<"analytics" | "manager" | "communication">(
+    role === "Employee" ? "communication" : role === "Manager" ? "manager" : "analytics"
+  );
   const [period, setPeriod] = useState<"semaine" | "mois" | "trimestre">("mois");
   const [showWriteReport, setShowWriteReport] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
@@ -941,10 +944,11 @@ export function ReportsPage() {
       {/* Tab navigation */}
       <div className="flex gap-1 p-1 rounded-2xl" style={{ background: "var(--hr-hover)", width: "fit-content" }}>
         {([
-          { id: "analytics", label: "Analyses RH" },
-          { id: "communication", label: "Communication" },
-        ] as const).map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+          { id: "analytics",     label: "Analyses RH",        show: role === "Admin" },
+          { id: "manager",       label: "Rapports Manager",    show: role === "Manager" || role === "Admin" },
+          { id: "communication", label: "Communication",       show: true },
+        ] as const).filter(t => t.show).map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
             className="px-4 py-2 rounded-xl text-sm transition-all"
             style={{
               background: activeTab === tab.id ? "var(--hr-card)" : "transparent",
@@ -959,6 +963,9 @@ export function ReportsPage() {
 
       {/* Analytics tab */}
       {activeTab === "analytics" && <AnalyticsReportsSection />}
+
+      {/* Manager tab */}
+      {activeTab === "manager" && <ManagerReportsSection />}
 
       {/* Communication tab */}
       {activeTab === "communication" && <>
