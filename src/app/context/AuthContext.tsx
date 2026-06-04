@@ -19,6 +19,8 @@ interface AuthContextType {
   deleteEmployee: (id: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   refreshCompany: () => Promise<void>;
+  notifPermission: 'default' | 'granted' | 'denied' | 'unsupported';
+  requestNotifPermission: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const isAuthenticated = !!currentUser;
-  useFcm(isAuthenticated);
+  const { permission: notifPermission, requestPermission: requestNotifPermission } = useFcm(isAuthenticated);
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -160,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated, loading,
       employees, addEmployee, updateEmployee, deleteEmployee,
       changePassword, refreshCompany,
+      notifPermission, requestNotifPermission,
     }}>
       {children}
     </AuthContext.Provider>
