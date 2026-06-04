@@ -495,22 +495,6 @@ export function AnalyticsReportsSection() {
         </div>
       </div>
 
-      {/* Quick generator cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {REPORT_TYPES.slice(0, 4).map(t => (
-          <motion.button key={t.id}
-            whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-            onClick={() => setShowGenerator(true)}
-            className="p-4 rounded-2xl text-left transition-all"
-            style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border)" }}>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: `${t.color}18` }}>
-              <t.icon size={16} style={{ color: t.color }} />
-            </div>
-            <p className="text-xs font-bold" style={{ color: "var(--hr-text)" }}>{t.label}</p>
-            <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-light)", fontSize: 10 }}>{t.desc}</p>
-          </motion.button>
-        ))}
-      </div>
 
       {/* Filter tabs */}
       {reports.length > 0 && (
