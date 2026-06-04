@@ -135,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(null);
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem("hr_fcm_token");
   };
 
   const addEmployee = async (emp: Employee & { password?: string; pin?: string }): Promise<void> => {

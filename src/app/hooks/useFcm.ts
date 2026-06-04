@@ -4,9 +4,15 @@ import { authApi } from '../services/api';
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
+const FCM_TOKEN_KEY = 'hr_fcm_token';
+
 async function registerToken() {
+  // Réutiliser le SW existant s'il est déjà enregistré (évite le 2ème rechargement
+  // que Edge déclenche lors de l'installation d'un nouveau service worker)
+  let reg: ServiceWorkerRegistration | undefined;
   try {
-    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
+       ?? await navigator.serviceWorker.register('/firebase-messaging-sw.js');
     console.log('[FCM] Service worker prêt :', reg.scope);
   } catch (e) {
     console.error('[FCM] ❌ Service worker échec :', e);
@@ -15,7 +21,8 @@ async function registerToken() {
 
   let token: string | null = null;
   try {
-    token = await getToken(messaging, { vapidKey: VAPID_KEY });
+    // Passer le SW registration explicitement évite que Firebase en installe un autre
+    token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
     console.log('[FCM] Token obtenu :', token ? `...${token.slice(-10)}` : 'VIDE');
   } catch (e) {
     console.error('[FCM] ❌ getToken() échec :', e);
@@ -27,8 +34,16 @@ async function registerToken() {
     return;
   }
 
+  // Stocker en localStorage pour éviter un appel API redondant si Edge recharge
+  const stored = localStorage.getItem(FCM_TOKEN_KEY);
+  if (stored === token) {
+    console.log('[FCM] ✓ Token inchangé — pas besoin de re-enregistrer');
+    return;
+  }
+
   try {
     await authApi.registerFcmToken(token);
+    localStorage.setItem(FCM_TOKEN_KEY, token);
     console.log('[FCM] ✓ Token enregistré sur le serveur');
   } catch (e) {
     console.error('[FCM] ❌ Enregistrement serveur échoué :', e);
