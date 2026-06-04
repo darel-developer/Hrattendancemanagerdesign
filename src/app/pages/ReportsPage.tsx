@@ -734,9 +734,8 @@ function WriteReportModal({ onClose, fixedRecipientId }: WriteReportModalProps) 
 export function ReportsPage() {
   const { currentUser, employees: allEmployees } = useAuth();
   const role = currentUser?.role;
-  const [activeTab, setActiveTab] = useState<"analytics" | "manager" | "communication">(
-    role === "Employee" ? "communication" : role === "Manager" ? "manager" : "analytics"
-  );
+  const defaultTab = role === "Admin" ? "analytics" : role === "Manager" ? "manager" : "communication";
+  const [activeTab, setActiveTab] = useState<"analytics" | "manager" | "communication">(defaultTab);
   const [period, setPeriod] = useState<"semaine" | "mois" | "trimestre">("mois");
   const [showWriteReport, setShowWriteReport] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
@@ -945,7 +944,7 @@ export function ReportsPage() {
       <div className="flex gap-1 p-1 rounded-2xl" style={{ background: "var(--hr-hover)", width: "fit-content" }}>
         {([
           { id: "analytics",     label: "Analyses RH",        show: role === "Admin" },
-          { id: "manager",       label: "Rapports Manager",    show: role === "Manager" || role === "Admin" },
+          { id: "manager",       label: "Rapports Manager",    show: role === "Manager" },
           { id: "communication", label: "Communication",       show: true },
         ] as const).filter(t => t.show).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
