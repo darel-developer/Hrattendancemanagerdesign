@@ -65,7 +65,6 @@ export function Sidebar() {
           leavesApi.getAll({ companyId: currentUser.companyId ?? undefined }),
         ]);
         const userNotifs = notifs.filter((n) =>
-          currentUser.role === "Admin" || currentUser.role === "Manager" ||
           n.employeeId === currentUser.id || n.employeeId === null
         );
         const unread = userNotifs.filter((n) => !n.isRead).length;

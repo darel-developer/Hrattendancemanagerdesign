@@ -50,9 +50,9 @@ export function Header() {
   const roleSuffix = role === "Admin" ? "admin" : role === "Manager" ? "manager" : "employee";
   const finalSubtitle = (pageKey && (tr[`page.${pageKey}.subtitle.${roleSuffix}`] || tr[`page.${pageKey}.subtitle`])) || "";
 
-  // Filter notifications for current user
+  // Chaque utilisateur ne voit que ses propres notifications + broadcasts
   const userNotifs = notifications.filter((n) =>
-    role === "Admin" || role === "Manager" || n.employeeId === currentUser?.id || n.employeeId === null
+    n.employeeId === currentUser?.id || n.employeeId === null
   );
   const unreadCount = userNotifs.filter((n) => !n.isRead).length;
 

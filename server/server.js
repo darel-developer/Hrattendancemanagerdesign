@@ -141,20 +141,26 @@ async function generateDailyAbsenceNotifications() {
         if (workDays.length > 0 && !workDays.includes(todayDayName)) continue;
       }
 
-      // Avoid duplicate notifications for today
+      // Éviter les doublons (vérifier si une alerte a déjà été envoyée au manager aujourd'hui)
+      const managerId = emp.manager_id || null;
+      const alertRecipient = managerId; // notifier le manager, pas l'employé absent
+      if (!alertRecipient) { absenceCount++; continue; } // pas de manager → skip
+
       const [existing] = await db.query(
         `SELECT id FROM notifications WHERE employee_id = ? AND type = 'absence'
-         AND DATE(date) = ? LIMIT 1`, [emp.id, today]
+         AND DATE(date) = ? AND message LIKE ?`,
+        [alertRecipient, today, `%${emp.id}%`]
       );
       if (existing.length === 0) {
-        const absTitle = `Absence non justifiée — ${emp.first_name} ${emp.last_name}`;
-        const absMsg = `${emp.first_name} ${emp.last_name} n'a pas pointé son arrivée aujourd'hui (${today}).`;
+        const absTitle = `Absence — ${emp.first_name} ${emp.last_name}`;
+        const absMsg = `${emp.first_name} ${emp.last_name} n'a pas pointé aujourd'hui (${today}).`;
+        // Créer notification in-app pour le manager seulement
         await db.query(
           `INSERT INTO notifications (id, type, title, message, date, is_read, employee_id)
            VALUES (?, 'absence', ?, ?, NOW(), FALSE, ?)`,
-          [notifId(), absTitle, absMsg, emp.id]
+          [notifId(), absTitle, absMsg + ` [${emp.id}]`, alertRecipient]
         );
-        sendPush(emp.id, absTitle, absMsg, '/attendance');
+        sendPush(alertRecipient, absTitle, absMsg, '/attendance');
         absenceCount++;
       }
     }

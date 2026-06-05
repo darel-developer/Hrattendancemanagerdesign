@@ -46,10 +46,10 @@ export function NotificationsPage() {
   useEffect(() => {
     const fetchNotifs = () => {
       notificationsApi.getAll(currentUser?.companyId ?? undefined).then((raw) => {
-        const filtered = currentUser?.role === "Employee"
-          ? raw.filter((n) => n.employeeId === currentUser.id || n.employeeId === null)
-          : raw;
-        setNotifs(filtered);
+        // Chaque utilisateur ne voit que ses propres notifications + les broadcasts
+        // Évite que l'admin voit les notifications d'absence des employés
+        // et les notifications de rapport destinées à d'autres
+        setNotifs(raw.filter((n) => n.employeeId === currentUser?.id || n.employeeId === null));
       }).catch(console.error);
     };
     fetchNotifs();
