@@ -7,6 +7,11 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { notificationsApi } from "../../services/api";
 import { Notification } from "../../data/mockData";
+
+const NOTIF_PATHS: Record<string, string> = {
+  absence: "/attendance", retard: "/attendance",
+  conge: "/leaves", document: "/documents", system: "/notifications",
+};
 import { translations } from "../../data/translations";
 
 export function Header() {
@@ -172,38 +177,57 @@ export function Header() {
                 className="absolute right-0 top-11 w-80 rounded-2xl shadow-2xl overflow-hidden z-50"
                 style={{ background: "var(--hr-card)", border: "1px solid var(--hr-card-border-hard)" }}>
                 <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--hr-card-border)" }}>
-                  <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>Notifications</p>
+                  <p className="text-sm" style={{ fontWeight: 700, color: "var(--hr-text)" }}>
+                    Notifications {unreadCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full text-white ml-1" style={{ background: "#EF4444" }}>{unreadCount}</span>}
+                  </p>
                   {unreadCount > 0 && (
-                    <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ background: "#EF4444" }}>
-                      {unreadCount} nouvelles
-                    </span>
+                    <button onClick={() => {
+                      notificationsApi.markAllRead(currentUser?.companyId ?? undefined).catch(() => {});
+                      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+                    }} className="text-xs" style={{ color: "#6366F1", fontWeight: 600 }}>
+                      Tout marquer lu
+                    </button>
                   )}
                 </div>
                 <div className="max-h-72 overflow-y-auto">
                   {userNotifs.length === 0 ? (
                     <p className="px-4 py-6 text-xs text-center" style={{ color: "var(--hr-text-muted)" }}>Aucune notification</p>
                   ) : (
-                    userNotifs.slice(0, 5).map((n) => (
+                    userNotifs.slice(0, 8).map((n) => (
                       <div key={n.id}
-                        className="flex items-start gap-3 px-4 py-3 border-b cursor-pointer transition-colors"
-                        style={{
-                          borderColor: "var(--hr-card-border)",
-                          background: n.isRead ? "transparent" : "rgba(99,102,241,0.05)",
+                        className="flex items-start gap-3 px-4 py-3 border-b cursor-pointer transition-all hover:opacity-80"
+                        style={{ borderColor: "var(--hr-card-border)", background: n.isRead ? "transparent" : "rgba(99,102,241,0.05)" }}
+                        onClick={() => {
+                          if (!n.isRead) {
+                            notificationsApi.markRead(n.id).catch(() => {});
+                            setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, isRead: true } : x));
+                          }
+                          setShowNotifPanel(false);
+                          navigate(NOTIF_PATHS[n.type] || "/notifications");
                         }}>
                         <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
                           style={{ background: n.isRead ? "var(--hr-text-light)" : "#6366F1" }} />
-                        <div>
-                          <p className="text-xs" style={{ fontWeight: 600, color: "var(--hr-text)" }}>{n.title}</p>
-                          <p className="text-xs mt-0.5" style={{ color: "var(--hr-text-muted)" }}>{n.message}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs truncate" style={{ fontWeight: n.isRead ? 500 : 700, color: "var(--hr-text)" }}>{n.title}</p>
+                          <p className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--hr-text-muted)" }}>{n.message}</p>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
-                <div className="px-4 py-2.5 text-center">
+                <div className="px-4 py-2.5 flex items-center justify-between">
+                  <button onClick={() => {
+                    if (currentUser?.companyId) {
+                      notificationsApi.deleteAll(currentUser.companyId).catch(() => {});
+                      setNotifications([]);
+                    }
+                    setShowNotifPanel(false);
+                  }} className="text-xs" style={{ color: "#EF4444", fontWeight: 600 }}>
+                    Tout supprimer
+                  </button>
                   <button onClick={() => { navigate("/notifications"); setShowNotifPanel(false); }}
-                    className="text-xs text-indigo-500 hover:text-indigo-400 transition-colors" style={{ fontWeight: 600 }}>
-                    Voir toutes les notifications →
+                    className="text-xs" style={{ color: "#6366F1", fontWeight: 600 }}>
+                    Voir tout →
                   </button>
                 </div>
               </motion.div>

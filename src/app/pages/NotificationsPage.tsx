@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useNavigate } from "react-router";
 import {
   Bell, UserX, CalendarDays, FileWarning, Timer, Settings2,
-  CheckCheck, Trash2, Filter, X
+  CheckCheck, Trash2, Filter, X, ChevronRight
 } from "lucide-react";
 import { Notification } from "../data/mockData";
 import { useAuth } from "../context/AuthContext";
 import { notificationsApi } from "../services/api";
+
+const NOTIF_PATHS: Record<string, string> = {
+  absence: "/attendance", retard: "/attendance",
+  conge: "/leaves", document: "/documents", system: "/notifications",
+};
 
 const typeConfig: Record<string, {
   icon: React.ComponentType<{ size?: number }>;
@@ -32,6 +38,7 @@ function timeAgo(dateStr: string): string {
 }
 
 export function NotificationsPage() {
+  const navigate = useNavigate();
   const { employees, currentUser } = useAuth();
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<"Tous" | "Non lus" | "absence" | "conge" | "document" | "retard" | "system">("Tous");
@@ -62,9 +69,11 @@ export function NotificationsPage() {
     await notificationsApi.markAllRead(currentUser?.companyId ?? undefined).catch(console.error);
     setNotifs((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
-  const markRead = async (id: string) => {
+  const markRead = async (id: string, type?: string) => {
     await notificationsApi.markRead(id).catch(console.error);
     setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+    const path = NOTIF_PATHS[type ?? ""] || "/notifications";
+    if (path !== "/notifications") navigate(path);
   };
   const deleteNotif = async (id: string) => {
     await notificationsApi.deleteOne(id).catch(console.error);
@@ -178,14 +187,14 @@ export function NotificationsPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20, height: 0 }}
                   transition={{ delay: i * 0.04 }}
-                  className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-2xl cursor-pointer group"
+                  className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-2xl cursor-pointer group hover:shadow-md transition-all"
                   style={{
                     background: n.isRead ? "white" : "rgba(99,102,241,0.03)",
                     border: "1.5px solid",
                     borderColor: n.isRead ? "#F1F3F9" : "rgba(99,102,241,0.15)",
                     boxShadow: n.isRead ? "0 1px 4px rgba(0,0,0,0.03)" : "0 2px 8px rgba(99,102,241,0.08)",
                   }}
-                  onClick={() => markRead(n.id)}
+                  onClick={() => markRead(n.id, n.type)}
                 >
                   {/* Icon */}
                   <div
@@ -217,12 +226,17 @@ export function NotificationsPage() {
                           {n.message}
                         </p>
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteNotif(n.id); }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded-lg flex items-center justify-center hover:bg-red-50 flex-shrink-0"
-                      >
-                        <X size={12} style={{ color: "#EF4444" }} />
-                      </button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {NOTIF_PATHS[n.type] !== "/notifications" && (
+                          <ChevronRight size={13} className="opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: "var(--hr-text-muted)" }} />
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteNotif(n.id); }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded-lg flex items-center justify-center hover:bg-red-50 flex-shrink-0"
+                        >
+                          <X size={12} style={{ color: "#EF4444" }} />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-3 mt-2">
