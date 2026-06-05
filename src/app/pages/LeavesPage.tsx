@@ -302,12 +302,7 @@ export function LeavesPage() {
         requestDate: new Date().toISOString().split("T")[0],
       });
       setLeaves((prev) => [created, ...prev]);
-      notificationsApi.create({
-        type: "conge",
-        title: "Nouvelle demande de congé",
-        message: `${currentUser?.firstName} ${currentUser?.lastName} a soumis une demande de ${leave.type} (${leave.days} jour${(leave.days ?? 0) > 1 ? "s" : ""})`,
-        employeeId: currentUser?.id,
-      }).catch(console.error);
+      // Notification au manager gérée côté serveur (leaves.js POST)
     } catch (err) {
       console.error("Erreur création congé :", err);
     }

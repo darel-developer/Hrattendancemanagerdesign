@@ -4,6 +4,22 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth, checkCompany } = require('../middleware/auth');
+const { sendPush } = require('../services/fcm');
+
+function notifId() {
+  return `NOT${Date.now().toString(36).slice(-7).toUpperCase()}`;
+}
+
+async function createNotification(db, employeeId, type, title, message) {
+  if (!employeeId) return;
+  const id = notifId();
+  await db.query(
+    `INSERT INTO notifications (id, type, title, message, date, is_read, employee_id)
+     VALUES (?, ?, ?, ?, NOW(), FALSE, ?)`,
+    [id, type, title, message, employeeId]
+  );
+  sendPush(employeeId, title, message, '/leaves');
+}
 
 function mapLeave(row) {
   return {
@@ -75,7 +91,36 @@ router.post('/', requireAuth, async (req, res) => {
       ]
     );
     const [rows] = await db.query('SELECT * FROM leave_requests WHERE id = ?', [id]);
-    res.status(201).json(mapLeave(rows[0]));
+    const leave = rows[0];
+
+    // Notifier le manager de l'employé (ou les admins si pas de manager)
+    try {
+      const [empRows] = await db.query(
+        'SELECT first_name, last_name, manager_id, company_id FROM employees WHERE id = ?',
+        [l.employeeId]
+      );
+      if (empRows.length > 0) {
+        const emp = empRows[0];
+        const title = 'Nouvelle demande de congé';
+        const message = `${emp.first_name} ${emp.last_name} a soumis une demande de ${l.type} (${l.days} jour${l.days > 1 ? 's' : ''})`;
+        if (emp.manager_id) {
+          await createNotification(db, emp.manager_id, 'conge', title, message);
+        } else {
+          // Pas de manager → notifier tous les admins de l'entreprise
+          const [admins] = await db.query(
+            "SELECT id FROM employees WHERE company_id = ? AND role = 'Admin'",
+            [emp.company_id]
+          );
+          for (const admin of admins) {
+            await createNotification(db, admin.id, 'conge', title, message);
+          }
+        }
+      }
+    } catch (notifErr) {
+      console.error('[Leaves] Notification POST :', notifErr.message);
+    }
+
+    res.status(201).json(mapLeave(leave));
   } catch (err) {
     console.error('[Leaves] POST /', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -142,7 +187,23 @@ router.put('/:id', requireAuth, async (req, res) => {
 
     const [rows] = await db.query('SELECT * FROM leave_requests WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Congé non trouvé' });
-    res.json(mapLeave(rows[0]));
+    const updated = rows[0];
+
+    // Notifier l'employé si son congé a été approuvé ou refusé
+    if (l.status === 'Approuvé' || l.status === 'Refusé') {
+      try {
+        const emoji = l.status === 'Approuvé' ? '✅' : '❌';
+        const title = `${emoji} Congé ${l.status.toLowerCase()}`;
+        const message = l.status === 'Approuvé'
+          ? `Votre demande de ${updated.type} (${updated.days} jour${updated.days > 1 ? 's' : ''}) a été approuvée.`
+          : `Votre demande de ${updated.type} a été refusée.${l.comment ? ` Motif : ${l.comment}` : ''}`;
+        await createNotification(db, updated.employee_id, 'conge', title, message);
+      } catch (notifErr) {
+        console.error('[Leaves] Notification PUT :', notifErr.message);
+      }
+    }
+
+    res.json(mapLeave(updated));
   } catch (err) {
     console.error('[Leaves] PUT /:id', err.message);
     res.status(500).json({ error: 'Erreur serveur' });
