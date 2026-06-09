@@ -984,11 +984,105 @@ node server/scripts/export_to_pg.js
 
 ---
 
+## 🆕 Nouvelle Fonctionnalité - Gestion Administrative du Personnel
+
+### 📦 Modules Récemment Ajoutés
+
+Une nouvelle suite complète pour la gestion administrative du personnel a été implémentée :
+
+- ✅ **Gestion des Contrats** - Upload, versioning, suivi expiration
+- ✅ **Dossier Numérique** - Documents personnels numérisés (CNI, diplômes, RIB, etc.)
+- ✅ **Fiches de Poste** - Numérotation automatique, versioning, public/private
+- ✅ **Règlement Intérieur** - Distribution, reconnaissance obligatoire, audit
+- ✅ **Audit Complet** - Traçabilité JSONB de toutes les actions
+
+### 📋 Documentation Complète
+
+Pour implémenter cette nouvelle fonctionnalité :
+
+1. **Commencer par** → [NEW_FEATURE_PERSONNEL_MANAGEMENT_README.md](NEW_FEATURE_PERSONNEL_MANAGEMENT_README.md)
+   - Vue d'ensemble des 4 fichiers créés
+   - Pas à pas d'exécution
+
+2. **Exécuter le script SQL** → [scripts/1_personnel_management_schema.sql](scripts/1_personnel_management_schema.sql)
+   - 7 tables PostgreSQL
+   - 3 vues optimisées
+   - 4 triggers automatiques
+   - Exécution: `psql -U postgres -d hr_attendance_db -f scripts/1_personnel_management_schema.sql`
+
+3. **Comprendre la migration** → [scripts/MIGRATION_PERSONNEL_MANAGEMENT.md](scripts/MIGRATION_PERSONNEL_MANAGEMENT.md)
+   - Détail de chaque table
+   - Instructions installation
+   - Commandes de vérification
+   - Script de rollback
+
+4. **Types TypeScript** → [src/app/data/personnelManagementTypes.ts](src/app/data/personnelManagementTypes.ts)
+   - 30+ interfaces TypeScript
+   - Prêt à importer dans React
+
+5. **Guide d'implémentation** → [IMPLEMENTATION_GUIDE_PERSONNEL_MANAGEMENT.md](IMPLEMENTATION_GUIDE_PERSONNEL_MANAGEMENT.md)
+   - Routes API Express détaillées
+   - Code React complet (4 pages)
+   - Services TypeScript
+   - Checklist
+
+### 🚀 Démarrage Rapide
+
+```bash
+# 1. Exécuter la migration BD
+psql -U postgres -d hr_attendance_db -f scripts/1_personnel_management_schema.sql
+
+# 2. Lire la documentation
+cat NEW_FEATURE_PERSONNEL_MANAGEMENT_README.md
+
+# 3. Implémenter les routes backend
+# Suivre: IMPLEMENTATION_GUIDE_PERSONNEL_MANAGEMENT.md
+
+# 4. Créer les pages React
+# Utiliser les types de: src/app/data/personnelManagementTypes.ts
+```
+
+### 📊 Tables Créées
+
+| Table | Rôle | Colonnes |
+|---|---|---|
+| `contracts` | Contrats travail (CDI, CDD, Stage) | 20+ |
+| `personnel_documents` | Documents numérisés | 25+ |
+| `job_descriptions` | Fiches de poste | 22+ |
+| `company_regulations` | Règlement intérieur | 18+ |
+| `regulation_acknowledgments` | Reconnaissance règlement | 8+ |
+| `personnel_document_audit_log` | Audit actions | 10+ |
+| `employees` (extension) | Infos enrichies | +10 colonnes |
+
+### 🔐 Sécurité
+
+✅ Audit complet (JSONB logs)  
+✅ Checksum SHA-256 des fichiers  
+✅ Contrôle d'accès par rôle  
+✅ Conformité RGPD  
+✅ Suppression cascade sécurisée
+
+### 📊 Vues SQL Disponibles
+
+```sql
+-- Employés avec détails + contrats + documents
+SELECT * FROM employees_detailed_view;
+
+-- Documents expirés ou à expiration proche
+SELECT * FROM personnel_documents_expiring_soon_view;
+
+-- Statut reconnaissance règlement par entreprise
+SELECT * FROM regulation_acknowledgment_status_view;
+```
+
+---
+
 ## Support & Contribution
 
 - **Issues** : Signalez bugs ou demandes sur GitHub Issues
 - **Pull Requests** : Forks + PR bienvenues, respectez conventions
 - **Code Review** : Tous les PR passent par review + tests
+- **Documentation** : Les nouvelles fonctionnalités incluent guides complets
 
 ---
 

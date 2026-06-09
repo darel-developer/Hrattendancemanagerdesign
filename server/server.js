@@ -23,6 +23,10 @@ const { router: departmentsRouter, ensureTable: ensureDepartmentsTable } = requi
 const performanceRouter = require('./routes/performance');
 const documentsRouter = require('./routes/documents');
 const planningRouter = require('./routes/planning');
+const contractsRouter = require('./routes/contracts');
+const personnelDocumentsRouter = require('./routes/personnel-documents');
+const jobDescriptionsRouter = require('./routes/job-descriptions');
+const regulationsRouter = require('./routes/regulations');
 const db = require('./db');
 const { initFCM, sendPush } = require('./services/fcm');
 
@@ -101,6 +105,10 @@ app.use('/api/departments', departmentsRouter);
 app.use('/api/performance', performanceRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/planning', planningRouter);
+app.use('/api/contracts', contractsRouter);
+app.use('/api/personnel-documents', personnelDocumentsRouter);
+app.use('/api/job-descriptions', jobDescriptionsRouter);
+app.use('/api/regulations', regulationsRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 

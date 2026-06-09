@@ -370,3 +370,165 @@ export const devicesApi = {
   reset: (employeeId: string) =>
     request<{ success: boolean }>(`/devices/${employeeId}`, { method: "DELETE" }),
 };
+
+// ─── Contracts ────────────────────────────────────────────────
+export interface Contract {
+  id: string;
+  employeeId: string;
+  contractType: string;
+  contractNumber: string;
+  startDate: string;
+  endDate?: string;
+  jobTitle: string;
+  salaryBase?: number;
+  status: string;
+  documentFilePath?: string;
+  createdAt: string;
+}
+
+export const contractsApi = {
+  getAll: (params?: { page?: number; pageSize?: number; status?: string; contractType?: string }) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
+    ).toString();
+    return request<any>(`/contracts${qs ? "?" + qs : ""}`);
+  },
+  getById: (id: string) => request<Contract>(`/contracts/${id}`),
+  create: (data: Partial<Contract>) =>
+    request<Contract>("/contracts", { method: "POST", body: JSON.stringify(data) }),
+  uploadDocument: (contractId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<any>(`/contracts/${contractId}/document`, {
+      method: "POST",
+      body: formData,
+      headers: { "Content-Type": "" } // Let browser set multipart
+    });
+  },
+  update: (id: string, data: Partial<Contract>) =>
+    request<Contract>(`/contracts/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/contracts/${id}`, { method: "DELETE" }),
+  downloadDocument: (id: string) =>
+    fetch(`${API_BASE}/contracts/${id}/download`, {
+      headers: _authToken ? { "Authorization": `Bearer ${_authToken}` } : {}
+    }),
+};
+
+// ─── Personnel Documents ──────────────────────────────────────
+export interface PersonnelDocument {
+  id: string;
+  employeeId: string;
+  documentType: string;
+  documentTitle: string;
+  documentNumber: string;
+  issueDate?: string;
+  expiryDate?: string;
+  fileName?: string;
+  isVerified?: boolean;
+  createdAt: string;
+}
+
+export const personnelDocumentsApi = {
+  getAll: (employeeId?: string, params?: any) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries({ employeeId, ...params } ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
+    ).toString();
+    return request<any>(`/personnel-documents${qs ? "?" + qs : ""}`);
+  },
+  getExpiringNow: () => request<any>(`/personnel-documents/expiring-soon`),
+  create: (formData: FormData) =>
+    request<PersonnelDocument>("/personnel-documents", { method: "POST", body: formData }),
+  verify: (id: string, isVerified: boolean, notes?: string) =>
+    request<PersonnelDocument>(`/personnel-documents/${id}/verify`, {
+      method: "PUT",
+      body: JSON.stringify({ isVerified, verificationNotes: notes }),
+    }),
+  download: (id: string) =>
+    fetch(`${API_BASE}/personnel-documents/${id}/download`, {
+      headers: _authToken ? { "Authorization": `Bearer ${_authToken}` } : {}
+    }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/personnel-documents/${id}`, { method: "DELETE" }),
+};
+
+// ─── Job Descriptions ─────────────────────────────────────────
+export interface JobDescription {
+  id: string;
+  jobTitle: string;
+  jobLevel: string;
+  jobFamily: string;
+  jobResponsibilities?: string;
+  jobSkillsRequired?: string;
+  workLocation?: string;
+  isPublic: boolean;
+  status: string;
+  version: number;
+  createdAt: string;
+}
+
+export const jobDescriptionsApi = {
+  getAll: (params?: { status?: string; isPublic?: string }) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
+    ).toString();
+    return request<any>(`/job-descriptions${qs ? "?" + qs : ""}`);
+  },
+  getById: (id: string) => request<JobDescription>(`/job-descriptions/${id}`),
+  create: (data: Partial<JobDescription>) =>
+    request<JobDescription>("/job-descriptions", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<JobDescription>) =>
+    request<JobDescription>(`/job-descriptions/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/job-descriptions/${id}`, { method: "DELETE" }),
+};
+
+// ─── Regulations ──────────────────────────────────────────────
+export interface CompanyRegulation {
+  id: string;
+  regulationTitle: string;
+  regulationVersion: string;
+  regulationContent?: string;
+  workingHours?: string;
+  leavePolicy?: string;
+  codeOfConduct?: string;
+  healthSafety?: string;
+  disciplinaryMeasures?: string;
+  remoteWorkPolicy?: string;
+  overtimePolicy?: string;
+  effectiveDate: string;
+  endDate?: string;
+  isMandatoryAcknowledgment: boolean;
+  status: string;
+  createdAt: string;
+}
+
+export const regulationsApi = {
+  getActive: (companyId?: string) => {
+    const qs = companyId ? `?companyId=${companyId}` : "";
+    return request<any>(`/regulations${qs}`);
+  },
+  getById: (id: string) => request<CompanyRegulation>(`/regulations/${id}`),
+  create: (data: FormData | Partial<CompanyRegulation>) =>
+    request<CompanyRegulation>("/regulations", {
+      method: "POST",
+      body: data instanceof FormData ? data : JSON.stringify(data),
+    }),
+  acknowledge: (id: string, payload: { acknowledgmentType: string; notes?: string }) =>
+    request<any>(`/regulations/${id}/acknowledge`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getAcknowledgmentStatus: (id: string) =>
+    request<any>(`/regulations/${id}/acknowledgment-status`),
+  getAcknowledgments: (id: string, params?: { page?: number; pageSize?: number }) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
+    ).toString();
+    return request<any>(`/regulations/${id}/acknowledgments${qs ? "?" + qs : ""}`);
+  },
+  download: (id: string) =>
+    fetch(`${API_BASE}/regulations/${id}/download`, {
+      headers: _authToken ? { "Authorization": `Bearer ${_authToken}` } : {}
+    }),
+};
