@@ -14,16 +14,16 @@ const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+const config = require('./config');
 
 const BACKUP_DIR = path.join(__dirname, 'backups');
-const RETENTION = parseInt(process.env.BACKUP_RETENTION || '30', 10);
+const RETENTION = config.backup.retention;
 
-const DB_HOST = process.env.DB_HOST || 'localhost';
-const DB_PORT = process.env.DB_PORT || '5432';
-const DB_USER = process.env.DB_USER || 'postgres';
-const DB_PASS = process.env.DB_PASSWORD || '';
-const DB_NAME = process.env.DB_NAME || 'hr_attendance_db';
+const DB_HOST = config.db.host;
+const DB_PORT = String(config.db.port);
+const DB_USER = config.db.user;
+const DB_PASS = config.db.password;
+const DB_NAME = config.db.name;
 
 // Chemin pg_dump selon l'OS
 function getPgDumpPath() {

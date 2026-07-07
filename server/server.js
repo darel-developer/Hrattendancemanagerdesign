@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+const config = require('./config');
 
 const { securityHeaders, authLimiter, kioskLimiter, superadminLimiter, generalLimiter } = require('./security');
 const { runBackup, scheduleDaily } = require('./backup');
@@ -31,10 +31,10 @@ const db = require('./db');
 const { initFCM, sendPush } = require('./services/fcm');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = config.server.port;
 
 // ─── Logger centralisé ────────────────────────────────────────────────────────
-const LOG_LEVEL = process.env.LOG_LEVEL || 'info'; // 'debug' | 'info' | 'warn' | 'error'
+const LOG_LEVEL = config.server.logLevel; // 'debug' | 'info' | 'warn' | 'error'
 function ts() { return new Date().toISOString(); }
 const logger = {
   debug: (...a) => LOG_LEVEL === 'debug' && console.debug(`[${ts()}] [DEBUG]`, ...a),
@@ -61,8 +61,7 @@ app.use((req, res, next) => {
 app.use(securityHeaders);
 
 // ─── CORS — origines autorisées uniquement ────────────────────────────────────
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5174')
-  .split(',').map((o) => o.trim());
+const allowedOrigins = config.cors.allowedOrigins;
 
 const corsOptions = {
   origin(origin, cb) {
@@ -117,7 +116,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 app.use((err, req, res, _next) => {
   const status = err.status || err.statusCode || 500;
   logger.error(`${req.method} ${req.originalUrl} — ${err.message}`);
-  if (process.env.NODE_ENV !== 'production') logger.error(err.stack);
+  if (!config.isProd) logger.error(err.stack);
   res.status(status).json({ error: status >= 500 ? 'Erreur serveur' : err.message });
 });
 
@@ -300,7 +299,7 @@ function scheduleAutoNotifications() {
 
 // ─── Startup ───────────────────────────────────────────────────────────────────
 app.listen(PORT, async () => {
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'CHANGE_ME_IN_PRODUCTION') {
+  if (!config.security.jwtSecret || config.security.jwtSecret === 'CHANGE_ME_IN_PRODUCTION') {
     console.warn('[SECURITY] JWT_SECRET non défini — utilisez une valeur sécurisée en production !');
   }
   console.log(`Serveur HR démarré sur http://localhost:${PORT}`);
@@ -451,7 +450,7 @@ app.listen(PORT, async () => {
   scheduleAutoNotifications();
 
   // ─── Backup automatique ──────────────────────────────────────────────────
-  if (process.env.AUTO_BACKUP !== 'false') {
+  if (config.backup.enabled) {
     // Backup immédiat au démarrage si le dernier date de plus de 24h
     const backupDir = require('path').join(__dirname, 'backups');
     const fs = require('fs');

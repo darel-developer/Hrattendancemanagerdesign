@@ -7,10 +7,14 @@ dist/
 build/
 .output/
 
-# ─── Variables d'environnement ───────────────────────────────
+# ─── Variables d'environnement ───────────────────────────────────────
+# Les fichiers .env.{development,staging,production} contiennent des
+# valeurs d'exemple et DOIVENT être trackés (pas de vrais secrets).
+# Seuls .env et .env.local (surcharges locales avec secrets) sont ignorés.
 .env
-.env.*
+.env.local
 server/.env
+server/.env.local
 *.local
 
 # ─── Clés et secrets ─────────────────────────────────────────

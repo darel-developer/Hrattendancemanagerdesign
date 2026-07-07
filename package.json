@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite",
+    "build:staging": "vite build --mode staging",
+    "build:prod": "vite build --mode production",
+    "dev": "vite --mode development",
+    "dev:staging": "vite --mode staging",
     "server": "node server/server.js",
     "server:install": "cd server && npm install"
   },
